@@ -1,0 +1,192 @@
+import { Node, Edge, Position } from "@xyflow/react"
+
+export const CARD_WIDTH = 270
+export const CARD_HEIGHT = 86
+
+export interface LayoutOptions {
+  direction?: "TB" | "LR"
+  nodeSep?: number
+  rankSep?: number
+}
+
+interface TreeLayoutNode {
+  id: string
+  node: Node
+  children: TreeLayoutNode[]
+  depth: number
+  span: number // width in TB, height in LR
+  primaryCoord: number // x in TB, y in LR
+  secondaryCoord: number // y in TB, x in LR
+}
+
+/**
+ * AAA Clustered Hierarchical Tree Layout (Buchheim/Walker style)
+ * - Guarantees each parent is positioned at the exact midpoint/center of its children
+ * - Guarantees subtrees never overlap and stay tightly clustered
+ * - Completely eliminates long spanning cross-canvas threads
+ * - Sibling order is preserved strictly according to category rank
+ */
+export function computeTreeLayout(
+  nodes: Node[],
+  edges: Edge[],
+  options: LayoutOptions = {}
+): { nodes: Node[]; edges: Edge[] } {
+  if (nodes.length === 0) return { nodes: [], edges: [] }
+
+  const direction = options.direction || "TB"
+  const isTB = direction === "TB"
+
+  const nodeSep = options.nodeSep ?? (isTB ? 40 : 28)
+  const rankSep = options.rankSep ?? (isTB ? 70 : 80)
+  const treeGap = isTB ? 80 : 64
+
+  const nodeMap = new Map<string, Node>(nodes.map((n) => [n.id, n]))
+  const childrenMap = new Map<string, string[]>()
+  const parentMap = new Map<string, string>()
+
+  edges.forEach((edge) => {
+    if (nodeMap.has(edge.source) && nodeMap.has(edge.target)) {
+      const list = childrenMap.get(edge.source) || []
+      list.push(edge.target)
+      childrenMap.set(edge.source, list)
+      parentMap.set(edge.target, edge.source)
+    }
+  })
+
+  // Identify roots (nodes with no incoming edge in the visible graph)
+  const rootNodes = nodes.filter((n) => !parentMap.has(n.id))
+
+  // Sort children by their category rank
+  const getRank = (id: string): number => {
+    const raw = (nodeMap.get(id)?.data as any)?.category?.rank
+    return typeof raw === "number" ? raw : 0
+  }
+
+  function buildTree(id: string, depth: number): TreeLayoutNode {
+    const rawNode = nodeMap.get(id)!
+    const childIds = (childrenMap.get(id) || []).sort(
+      (a, b) => getRank(a) - getRank(b) || a.localeCompare(b)
+    )
+
+    const children = childIds.map((childId) => buildTree(childId, depth + 1))
+
+    return {
+      id,
+      node: rawNode,
+      children,
+      depth,
+      span: 0,
+      primaryCoord: 0,
+      secondaryCoord: 0,
+    }
+  }
+
+  // 1. Post-order pass: Compute subtree span (width in TB, height in LR)
+  function computeSpan(treeNode: TreeLayoutNode): number {
+    const baseSpan = isTB ? CARD_WIDTH : CARD_HEIGHT
+    if (treeNode.children.length === 0) {
+      treeNode.span = baseSpan
+      return baseSpan
+    }
+
+    let childrenSpanTotal = 0
+    treeNode.children.forEach((child, index) => {
+      const childSpan = computeSpan(child)
+      childrenSpanTotal += childSpan + (index > 0 ? nodeSep : 0)
+    })
+
+    treeNode.span = Math.max(baseSpan, childrenSpanTotal)
+    return treeNode.span
+  }
+
+  // 2. Pre-order pass: Position nodes
+  function assignPositions(
+    treeNode: TreeLayoutNode,
+    startOffset: number,
+    depth: number
+  ) {
+    const baseSpan = isTB ? CARD_WIDTH : CARD_HEIGHT
+    const baseSecondary = isTB ? CARD_HEIGHT : CARD_WIDTH
+
+    treeNode.secondaryCoord = depth * (baseSecondary + rankSep)
+
+    if (treeNode.children.length === 0) {
+      treeNode.primaryCoord = startOffset + (treeNode.span - baseSpan) / 2
+      return
+    }
+
+    let currentOffset = startOffset
+    treeNode.children.forEach((child) => {
+      assignPositions(child, currentOffset, depth + 1)
+      currentOffset += child.span + nodeSep
+    })
+
+    // Center parent directly between first and last child
+    const firstChild = treeNode.children[0]
+    const lastChild = treeNode.children[treeNode.children.length - 1]
+    const centerOfChildren = (firstChild.primaryCoord + lastChild.primaryCoord) / 2
+
+    treeNode.primaryCoord = centerOfChildren
+  }
+
+  // Sort roots by their rank
+  rootNodes.sort((a, b) => getRank(a.id) - getRank(b.id) || a.id.localeCompare(b.id))
+
+  const positionedNodes: Node[] = []
+  let globalOffset = 0
+
+  rootNodes.forEach((root) => {
+    const tree = buildTree(root.id, 0)
+    computeSpan(tree)
+    assignPositions(tree, globalOffset, 0)
+    globalOffset += tree.span + treeGap
+
+    // Flatten tree
+    function collect(node: TreeLayoutNode) {
+      const x = isTB ? node.primaryCoord : node.secondaryCoord
+      const y = isTB ? node.secondaryCoord : node.primaryCoord
+
+      positionedNodes.push({
+        ...node.node,
+        targetPosition: isTB ? Position.Top : Position.Left,
+        sourcePosition: isTB ? Position.Bottom : Position.Right,
+        position: { x, y },
+      })
+
+      node.children.forEach(collect)
+    }
+
+    collect(tree)
+  })
+
+  // Style edges to match branch color
+  const styledEdges: Edge[] = edges.map((e) => {
+    const sourceNode = nodeMap.get(e.source)
+    const targetNode = nodeMap.get(e.target)
+    const branchColor =
+      (e.data as any)?.branchColor ||
+      (targetNode?.data as any)?.branchColor ||
+      (sourceNode?.data as any)?.branchColor ||
+      "#64748b"
+
+    return {
+      ...e,
+      data: {
+        ...e.data,
+        branchColor,
+      },
+      style: {
+        ...e.style,
+        stroke: branchColor,
+        strokeWidth: 2,
+        opacity: 0.95,
+      },
+    }
+  })
+
+  return { nodes: positionedNodes, edges: styledEdges }
+}
+
+// Keep computeDagreLayout as alias to guarantee backwards compatibility
+export const computeDagreLayout = computeTreeLayout
+

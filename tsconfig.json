@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "jsx": "react-jsx",
+    "declaration": true,
+    "outDir": "./.medusa/server",
+    "rootDir": "./",
+    "strict": false,
+    "noImplicitAny": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@medusajs/framework/*": ["../backend/node_modules/@medusajs/framework/dist/*"],
+      "@medusajs/framework": ["../backend/node_modules/@medusajs/framework/dist"],
+      "@medusajs/utils/*": ["../backend/node_modules/@medusajs/utils/dist/*"],
+      "@medusajs/utils": ["../backend/node_modules/@medusajs/utils/dist"],
+      "@medusajs/medusa/*": ["../backend/node_modules/@medusajs/medusa/dist/*"],
+      "@medusajs/medusa": ["../backend/node_modules/@medusajs/medusa/dist"],
+      "@medusajs/admin-sdk": ["../backend/node_modules/@medusajs/admin-sdk/dist"],
+      "@medusajs/js-sdk": ["../backend/node_modules/@medusajs/js-sdk/dist"],
+      "@medusajs/ui": ["../backend/node_modules/@medusajs/ui"],
+      "@medusajs/icons": ["../backend/node_modules/@medusajs/icons"],
+      "@tanstack/react-query": ["../backend/node_modules/@tanstack/react-query"],
+      "@xyflow/react": ["../backend/node_modules/@xyflow/react"],
+      "@dagrejs/dagre": ["../backend/node_modules/@dagrejs/dagre"],
+      "zod": ["../backend/node_modules/zod"],
+      "react": ["../backend/node_modules/@types/react"],
+      "react/jsx-runtime": ["../backend/node_modules/@types/react/jsx-runtime"]
+    }
+  },
+  "include": ["src/**/*"]
+}

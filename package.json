@@ -1,0 +1,86 @@
+{
+  "name": "@hectasquare/medusa-plugin-category-tree",
+  "version": "1.0.6",
+  "description": "AAA Interactive Category Tree & Mind Map for Medusa v2 Admin with drag-and-drop reparenting, tier indicators, superscript ranks, multi-storefront filtering, and NotebookLM-style subtree collapse.",
+  "author": "HectaSquare Team",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HectaSquareUK/medusa-plugin-category-tree.git"
+  },
+  "bugs": {
+    "url": "https://github.com/HectaSquareUK/medusa-plugin-category-tree/issues"
+  },
+  "homepage": "https://github.com/HectaSquareUK/medusa-plugin-category-tree#readme",
+  "keywords": [
+    "medusa",
+    "medusa-v2",
+    "medusa-plugin",
+    "medusa-plugin-integration",
+    "medusa-plugin-other",
+    "categories",
+    "category-tree",
+    "mindmap",
+    "admin"
+  ],
+  "main": ".medusa/server/src/index.js",
+  "module": ".medusa/server/src/index.js",
+  "types": ".medusa/server/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./.medusa/server/src/index.d.ts",
+      "import": "./.medusa/server/src/index.js",
+      "require": "./.medusa/server/src/index.js",
+      "default": "./.medusa/server/src/index.js"
+    },
+    "./package.json": "./package.json",
+    "./admin": {
+      "types": "./.medusa/server/src/admin/index.d.ts",
+      "import": "./.medusa/server/src/admin/index.js",
+      "require": "./.medusa/server/src/admin/index.js",
+      "default": "./.medusa/server/src/admin/index.js"
+    },
+    "./.medusa/server/src/*": "./.medusa/server/src/*",
+    "./.medusa/server/*": "./.medusa/server/*",
+    "./*": "./*"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    ".medusa/server",
+    "src",
+    "admin",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@dagrejs/dagre": "^1.1.4",
+    "@xyflow/react": "^12.4.0",
+    "zod": "^3.23.8"
+  },
+  "peerDependencies": {
+    "@medusajs/admin-sdk": "^2.12.0",
+    "@medusajs/framework": "^2.12.0",
+    "@medusajs/icons": "^2.12.0",
+    "@medusajs/js-sdk": "^2.12.0",
+    "@medusajs/medusa": "^2.12.0",
+    "@medusajs/ui": "^4.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@medusajs/admin-sdk": "^2.12.4",
+    "@medusajs/framework": "^2.12.4",
+    "@medusajs/icons": "^2.13.1",
+    "@medusajs/ui": "^4.1.1",
+    "@types/dagre": "^0.7.52",
+    "@types/node": "^20.17.10",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "typescript": "^5.7.2"
+  }
+}
