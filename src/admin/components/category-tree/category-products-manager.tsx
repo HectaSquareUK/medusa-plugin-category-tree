@@ -59,6 +59,11 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
 
   const PAGE_SIZE = 50
 
+  const orderedProductIdsRef = React.useRef<string[]>(orderedProductIds)
+  useEffect(() => {
+    orderedProductIdsRef.current = orderedProductIds
+  }, [orderedProductIds])
+
   // Initialize ranking and top sellers from category metadata
   useEffect(() => {
     if (initialMetadata) {
@@ -82,8 +87,8 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
       setTotalCount(res.count ?? fetched.length)
 
       // Sort products according to orderedProductIds if available
-      setProducts((prev) => {
-        const orderMap = new Map(orderedProductIds.map((id, index) => [id, index]))
+      setProducts(() => {
+        const orderMap = new Map((orderedProductIdsRef.current || []).map((id, index) => [id, index]))
         return [...fetched].sort((a, b) => {
           const indexA = orderMap.has(a.id) ? orderMap.get(a.id)! : 9999
           const indexB = orderMap.has(b.id) ? orderMap.get(b.id)! : 9999
@@ -95,7 +100,7 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
     } finally {
       setIsLoading(false)
     }
-  }, [categoryId, orderedProductIds])
+  }, [categoryId])
 
   useEffect(() => {
     loadAssignedProducts()
@@ -404,8 +409,12 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
                             type="button"
                             title="Move Up"
                             disabled={index === 0}
-                            onClick={() => handleMoveProduct(index, "up")}
-                            className="text-[9px] text-ui-fg-muted hover:text-ui-fg-base disabled:opacity-20 px-0.5 leading-none"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              handleMoveProduct(index, "up")
+                            }}
+                            className="text-[9px] text-ui-fg-muted hover:text-ui-fg-base disabled:opacity-20 px-0.5 leading-none cursor-pointer"
                           >
                             ▲
                           </button>
@@ -413,8 +422,12 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
                             type="button"
                             title="Move Down"
                             disabled={index === displayedProducts.length - 1}
-                            onClick={() => handleMoveProduct(index, "down")}
-                            className="text-[9px] text-ui-fg-muted hover:text-ui-fg-base disabled:opacity-20 px-0.5 leading-none"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              handleMoveProduct(index, "down")
+                            }}
+                            className="text-[9px] text-ui-fg-muted hover:text-ui-fg-base disabled:opacity-20 px-0.5 leading-none cursor-pointer"
                           >
                             ▼
                           </button>
@@ -444,7 +457,11 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
                     <td className="py-2.5 px-3">
                       <button
                         type="button"
-                        onClick={() => handleToggleTopSeller(p.id, p.title)}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleToggleTopSeller(p.id, p.title)
+                        }}
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-all ${
                           isTopSeller
                             ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700 shadow-2xs"
@@ -485,7 +502,11 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
                       <button
                         type="button"
                         title="Remove from category"
-                        onClick={() => handleRemoveProducts([p.id])}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleRemoveProducts([p.id])
+                        }}
                         className="p-1 text-ui-fg-muted hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded transition-colors"
                       >
                         <Trash className="w-3.5 h-3.5" />

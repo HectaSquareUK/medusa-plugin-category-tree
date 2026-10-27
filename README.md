@@ -47,7 +47,9 @@ Clicking the edit pencil icon on any node opens a wide slide-over hub featuring 
    - **Full-Screen FocusModal:** Direct parity with Medusa's legacy Add Products modal with full-width table, search (`Q Search`), pagination, and batch assignment.
 3. **Storefronts & Media:**
    - Multi-sales channel visibility checkboxes (`Monfil Store`, `Superpunch`, etc.).
-   - Category thumbnail and image URL editor with live preview.
+   - **Native Drag-and-Drop Media Upload:** Integrated with Medusa v2's native File Module (`sdk.admin.upload.create`).
+   - **Visual Gallery Manager:** Image preview cards, delete actions, and one-click `★ Thumbnail` designation.
+   - **Direct External URL Input:** Fallback support for external CDN, Cloudinary, or DAM image links.
 4. **YouTube Videos:**
    - Multi-video demonstration manager with real-time thumbnail preview cards and quick remove actions.
 
@@ -151,6 +153,114 @@ if (topSellerIds.length > 0) {
   
   // Fill remaining slots from the general category pool without duplicates
   return [...topProducts, ...otherCategoryProducts]
+}
+```
+
+---
+
+## ☁️ Media Upload & Storage Provider Compatibility
+
+The plugin's Category Detail Hub features a unified media uploader and gallery manager. To ensure zero vendor lock-in, file handling is **100% storage-provider agnostic**:
+
+1. **Native Medusa File Module Pipeline:**
+   - Uploads execute via Medusa v2's native SDK (`sdk.admin.upload.create({ files })`), routing directly to `POST /admin/uploads`.
+   - Your backend delegates the upload to whichever File Module Provider is configured in `medusa-config.js` and returns the CDN URL.
+2. **Direct External URL / CDN Fallback:**
+   - If your assets are hosted on an external DAM, Cloudinary, Imgix, or third-party S3 bucket, you can simply paste the image URL directly into the uploader and click **Add**.
+
+### 💡 Category Media in Medusa v2: Native vs. Plugin Architecture
+
+In core Medusa v2, products have native media tables (`product_images`), but **`product_category` does not have a native images relationship out of the box**. 
+
+To solve this universally without imposing mandatory database migrations on standard Medusa stores, this plugin employs an **adaptive hybrid architecture**:
+
+- **Universal Metadata Mode (Zero Config / Out of the Box):**
+  - Stores all gallery assets and active thumbnail directly inside Medusa's native `category.metadata`:
+    ```json
+    {
+      "metadata": {
+        "image_url": "https://cdn.store.com/category-thumb.webp",
+        "images": [
+          { "id": "img_01", "url": "https://cdn.store.com/hero.webp", "type": "thumbnail" },
+          { "id": "img_02", "url": "https://cdn.store.com/banner.webp", "type": "image" }
+        ]
+      }
+    }
+    ```
+  - **Zero backend code or database migrations required.** Any standard Medusa v2 installation supports this immediately.
+
+- **Custom Backend Module Mode (Optional Extended Architecture):**
+  - If your backend has extended the Medusa framework with a custom Category Media module (e.g., custom DML model `product_category_image` exposing `/admin/categories/:category_id/images`), the plugin detects this endpoint and automatically synchronizes both the custom relation and metadata!
+
+### Configuring S3-Compatible Storage in Medusa v2
+
+Because Medusa abstracts storage through `@medusajs/medusa/file-s3`, you can seamlessly route category media to **AWS S3, Cloudflare R2, MinIO, or DigitalOcean Spaces** by adjusting `medusa-config.js`:
+
+#### AWS S3
+```javascript
+// medusa-config.js
+module.exports = defineConfig({
+  modules: [
+    {
+      resolve: "@medusajs/medusa/file",
+      options: {
+        providers: [
+          {
+            resolve: "@medusajs/medusa/file-s3",
+            id: "s3",
+            options: {
+              file_url: process.env.MEDUSA_FILE_URL, // CDN or bucket public URL
+              access_key_id: process.env.S3_ACCESS_KEY_ID,
+              secret_access_key: process.env.S3_SECRET_ACCESS_KEY,
+              region: process.env.S3_REGION,
+              bucket: process.env.S3_BUCKET,
+            },
+          },
+        ],
+      },
+    },
+  ],
+})
+```
+
+#### Cloudflare R2
+```javascript
+// medusa-config.js
+options: {
+  file_url: process.env.R2_PUBLIC_URL, // e.g. https://pub-xxxx.r2.dev or custom domain
+  access_key_id: process.env.R2_ACCESS_KEY_ID,
+  secret_access_key: process.env.R2_SECRET_ACCESS_KEY,
+  bucket: process.env.R2_BUCKET_NAME,
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  region: "auto",
+}
+```
+
+#### MinIO (Self-Hosted S3)
+```javascript
+// medusa-config.js
+options: {
+  file_url: process.env.MINIO_PUBLIC_URL, // e.g. http://localhost:9000/my-bucket
+  access_key_id: process.env.MINIO_ROOT_USER,
+  secret_access_key: process.env.MINIO_ROOT_PASSWORD,
+  bucket: process.env.MINIO_BUCKET,
+  endpoint: process.env.MINIO_ENDPOINT, // e.g. http://127.0.0.1:9000
+  additional_client_config: {
+    forcePathStyle: true, // Required for MinIO
+  },
+}
+```
+
+#### DigitalOcean Spaces
+```javascript
+// medusa-config.js
+options: {
+  file_url: `https://${process.env.DO_SPACES_BUCKET}.${process.env.DO_SPACES_REGION}.digitaloceanspaces.com`,
+  access_key_id: process.env.DO_SPACES_KEY,
+  secret_access_key: process.env.DO_SPACES_SECRET,
+  bucket: process.env.DO_SPACES_BUCKET,
+  endpoint: `https://${process.env.DO_SPACES_REGION}.digitaloceanspaces.com`,
+  region: process.env.DO_SPACES_REGION,
 }
 ```
 

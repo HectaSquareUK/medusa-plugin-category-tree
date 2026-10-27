@@ -6,6 +6,7 @@ export interface CanvasDockProps {
     onSelectStorefront: (val: string) => void;
     direction: "TB" | "LR";
     onToggleDirection: () => void;
+    onSelectDirection?: (val: "TB" | "LR") => void;
     searchQuery: string;
     onSearchChange: (q: string) => void;
     onExpandAll: () => void;

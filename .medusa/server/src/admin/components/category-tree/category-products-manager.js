@@ -1,8 +1,41 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CategoryProductsManager = void 0;
 const jsx_runtime_1 = require("react/jsx-runtime");
-const react_1 = require("react");
+const react_1 = __importStar(require("react"));
 const ui_1 = require("@medusajs/ui");
 const icons_1 = require("@medusajs/icons");
 const sdk_1 = require("../../lib/sdk");
@@ -26,6 +59,10 @@ const CategoryProductsManager = ({ categoryId, categoryName, initialMetadata, on
     const [catalogSelectedIds, setCatalogSelectedIds] = (0, react_1.useState)(new Set());
     const [isAdding, setIsAdding] = (0, react_1.useState)(false);
     const PAGE_SIZE = 50;
+    const orderedProductIdsRef = react_1.default.useRef(orderedProductIds);
+    (0, react_1.useEffect)(() => {
+        orderedProductIdsRef.current = orderedProductIds;
+    }, [orderedProductIds]);
     // Initialize ranking and top sellers from category metadata
     (0, react_1.useEffect)(() => {
         if (initialMetadata) {
@@ -45,8 +82,8 @@ const CategoryProductsManager = ({ categoryId, categoryName, initialMetadata, on
             const fetched = res.products || [];
             setTotalCount(res.count ?? fetched.length);
             // Sort products according to orderedProductIds if available
-            setProducts((prev) => {
-                const orderMap = new Map(orderedProductIds.map((id, index) => [id, index]));
+            setProducts(() => {
+                const orderMap = new Map((orderedProductIdsRef.current || []).map((id, index) => [id, index]));
                 return [...fetched].sort((a, b) => {
                     const indexA = orderMap.has(a.id) ? orderMap.get(a.id) : 9999;
                     const indexB = orderMap.has(b.id) ? orderMap.get(b.id) : 9999;
@@ -60,7 +97,7 @@ const CategoryProductsManager = ({ categoryId, categoryName, initialMetadata, on
         finally {
             setIsLoading(false);
         }
-    }, [categoryId, orderedProductIds]);
+    }, [categoryId]);
     (0, react_1.useEffect)(() => {
         loadAssignedProducts();
     }, [loadAssignedProducts]);
@@ -234,13 +271,29 @@ const CategoryProductsManager = ({ categoryId, categoryName, initialMetadata, on
                                                             next.add(p.id);
                                                         return next;
                                                     });
-                                                }, className: "rounded border-ui-border-base cursor-pointer" }) }), (0, jsx_runtime_1.jsx)("td", { className: "py-2.5 px-3", children: (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-1 font-mono", children: [(0, jsx_runtime_1.jsxs)("span", { className: "text-xs font-bold text-ui-fg-subtle px-1.5 py-0.5 rounded bg-ui-bg-subtle border border-ui-border-base", children: ["#", index + 1] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col", children: [(0, jsx_runtime_1.jsx)("button", { type: "button", title: "Move Up", disabled: index === 0, onClick: () => handleMoveProduct(index, "up"), className: "text-[9px] text-ui-fg-muted hover:text-ui-fg-base disabled:opacity-20 px-0.5 leading-none", children: "\u25B2" }), (0, jsx_runtime_1.jsx)("button", { type: "button", title: "Move Down", disabled: index === displayedProducts.length - 1, onClick: () => handleMoveProduct(index, "down"), className: "text-[9px] text-ui-fg-muted hover:text-ui-fg-base disabled:opacity-20 px-0.5 leading-none", children: "\u25BC" })] })] }) }), (0, jsx_runtime_1.jsx)("td", { className: "py-2.5 px-3", children: (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-2.5 min-w-0", children: [(0, jsx_runtime_1.jsx)("div", { className: "w-9 h-9 rounded-md border border-ui-border-base overflow-hidden bg-ui-bg-subtle flex-shrink-0 flex items-center justify-center", children: p.thumbnail ? ((0, jsx_runtime_1.jsx)("img", { src: p.thumbnail, alt: p.title, className: "w-full h-full object-cover" })) : ((0, jsx_runtime_1.jsx)("span", { className: "text-[9px] text-ui-fg-muted", children: "IMG" })) }), (0, jsx_runtime_1.jsx)("div", { className: "flex flex-col min-w-0", children: (0, jsx_runtime_1.jsx)("span", { className: "font-semibold text-ui-fg-base truncate leading-snug", title: p.title, children: p.title }) })] }) }), (0, jsx_runtime_1.jsx)("td", { className: "py-2.5 px-3", children: (0, jsx_runtime_1.jsxs)("button", { type: "button", onClick: () => handleToggleTopSeller(p.id, p.title), className: `inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-all ${isTopSeller
+                                                }, className: "rounded border-ui-border-base cursor-pointer" }) }), (0, jsx_runtime_1.jsx)("td", { className: "py-2.5 px-3", children: (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-1 font-mono", children: [(0, jsx_runtime_1.jsxs)("span", { className: "text-xs font-bold text-ui-fg-subtle px-1.5 py-0.5 rounded bg-ui-bg-subtle border border-ui-border-base", children: ["#", index + 1] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col", children: [(0, jsx_runtime_1.jsx)("button", { type: "button", title: "Move Up", disabled: index === 0, onClick: (e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    handleMoveProduct(index, "up");
+                                                                }, className: "text-[9px] text-ui-fg-muted hover:text-ui-fg-base disabled:opacity-20 px-0.5 leading-none cursor-pointer", children: "\u25B2" }), (0, jsx_runtime_1.jsx)("button", { type: "button", title: "Move Down", disabled: index === displayedProducts.length - 1, onClick: (e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    handleMoveProduct(index, "down");
+                                                                }, className: "text-[9px] text-ui-fg-muted hover:text-ui-fg-base disabled:opacity-20 px-0.5 leading-none cursor-pointer", children: "\u25BC" })] })] }) }), (0, jsx_runtime_1.jsx)("td", { className: "py-2.5 px-3", children: (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-2.5 min-w-0", children: [(0, jsx_runtime_1.jsx)("div", { className: "w-9 h-9 rounded-md border border-ui-border-base overflow-hidden bg-ui-bg-subtle flex-shrink-0 flex items-center justify-center", children: p.thumbnail ? ((0, jsx_runtime_1.jsx)("img", { src: p.thumbnail, alt: p.title, className: "w-full h-full object-cover" })) : ((0, jsx_runtime_1.jsx)("span", { className: "text-[9px] text-ui-fg-muted", children: "IMG" })) }), (0, jsx_runtime_1.jsx)("div", { className: "flex flex-col min-w-0", children: (0, jsx_runtime_1.jsx)("span", { className: "font-semibold text-ui-fg-base truncate leading-snug", title: p.title, children: p.title }) })] }) }), (0, jsx_runtime_1.jsx)("td", { className: "py-2.5 px-3", children: (0, jsx_runtime_1.jsxs)("button", { type: "button", onClick: (e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    handleToggleTopSeller(p.id, p.title);
+                                                }, className: `inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-all ${isTopSeller
                                                     ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700 shadow-2xs"
                                                     : "bg-ui-bg-subtle text-ui-fg-muted border-ui-border-base hover:text-amber-600 hover:border-amber-300"}`, title: isTopSeller
                                                     ? "Click to remove from Top Commercial Sellers"
                                                     : "Click to mark as Top Commercial Seller (Reflected in Storefront 2)", children: [(0, jsx_runtime_1.jsx)("span", { children: isTopSeller ? "★" : "☆" }), (0, jsx_runtime_1.jsx)("span", { children: isTopSeller ? "Top Seller" : "Normal" })] }) }), (0, jsx_runtime_1.jsx)("td", { className: "py-2.5 px-3 text-ui-fg-muted", children: p.collection?.title || "-" }), (0, jsx_runtime_1.jsxs)("td", { className: "py-2.5 px-3 text-ui-fg-subtle", children: [p.variants?.length || 0, " variant(s)"] }), (0, jsx_runtime_1.jsx)("td", { className: "py-2.5 px-3", children: (0, jsx_runtime_1.jsx)("span", { className: `inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${p.status === "published"
                                                     ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300"
-                                                    : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"}`, children: p.status }) }), (0, jsx_runtime_1.jsx)("td", { className: "py-2.5 px-3 text-right", children: (0, jsx_runtime_1.jsx)("button", { type: "button", title: "Remove from category", onClick: () => handleRemoveProducts([p.id]), className: "p-1 text-ui-fg-muted hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded transition-colors", children: (0, jsx_runtime_1.jsx)(icons_1.Trash, { className: "w-3.5 h-3.5" }) }) })] }, p.id));
+                                                    : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"}`, children: p.status }) }), (0, jsx_runtime_1.jsx)("td", { className: "py-2.5 px-3 text-right", children: (0, jsx_runtime_1.jsx)("button", { type: "button", title: "Remove from category", onClick: (e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    handleRemoveProducts([p.id]);
+                                                }, className: "p-1 text-ui-fg-muted hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded transition-colors", children: (0, jsx_runtime_1.jsx)(icons_1.Trash, { className: "w-3.5 h-3.5" }) }) })] }, p.id));
                             }) })] })) }), focusModalOpen && ((0, jsx_runtime_1.jsxs)("div", { className: "fixed inset-0 z-50 flex flex-col bg-white dark:bg-neutral-950 animate-in fade-in-50", children: [(0, jsx_runtime_1.jsxs)("div", { className: "flex items-center justify-between px-6 py-3 border-b border-ui-border-base bg-ui-bg-base flex-shrink-0", children: [(0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-3", children: [(0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => setFocusModalOpen(false), className: "p-1.5 rounded-lg text-ui-fg-muted hover:text-ui-fg-base hover:bg-ui-bg-subtle transition-colors", title: "Close (ESC)", children: (0, jsx_runtime_1.jsx)("span", { className: "text-sm font-bold", children: "\u2715" }) }), (0, jsx_runtime_1.jsx)("span", { className: "text-[11px] font-mono font-medium text-ui-fg-muted px-1.5 py-0.5 rounded bg-ui-bg-subtle border border-ui-border-base", children: "ESC" }), (0, jsx_runtime_1.jsxs)("h2", { className: "text-sm font-semibold text-ui-fg-base", children: ["Add Products to Category: ", categoryName] })] }), (0, jsx_runtime_1.jsx)("div", { className: "flex items-center gap-3", children: (0, jsx_runtime_1.jsxs)("div", { className: "relative w-64", children: [(0, jsx_runtime_1.jsx)("input", { type: "text", placeholder: "Search products\u2026", value: searchQuery, onChange: (e) => {
                                                 setSearchQuery(e.target.value);
                                                 setCatalogPage(0);

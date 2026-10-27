@@ -14,6 +14,7 @@ export interface CanvasDockProps {
 
   direction: "TB" | "LR"
   onToggleDirection: () => void
+  onSelectDirection?: (val: "TB" | "LR") => void
 
   searchQuery: string
   onSearchChange: (q: string) => void
@@ -47,6 +48,7 @@ export const CanvasDock: React.FC<CanvasDockProps> = ({
   onSelectStorefront,
   direction,
   onToggleDirection,
+  onSelectDirection,
   searchQuery,
   onSearchChange,
   onExpandAll,
@@ -57,6 +59,8 @@ export const CanvasDock: React.FC<CanvasDockProps> = ({
   onCollapseSelected,
   isBoxSelect = false,
   onToggleBoxSelect,
+  onZoomIn,
+  onZoomOut,
   onFitView,
   onOpenCreateRoot,
   dirtyCount,
@@ -86,14 +90,32 @@ export const CanvasDock: React.FC<CanvasDockProps> = ({
         </div>
 
         <div className="flex items-center border-r border-ui-border-base pr-2.5">
-          <button
-            type="button"
-            title={direction === "TB" ? "Switch to Mind Map (Left-to-Right)" : "Switch to Vertical Tree (Top-to-Bottom)"}
-            onClick={onToggleDirection}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg bg-ui-bg-subtle text-ui-fg-base hover:bg-ui-bg-base border border-ui-border-base transition-colors"
-          >
-            <span>{direction === "TB" ? "⬇ Vertical" : "➡ Mind Map"}</span>
-          </button>
+          <div className="flex items-center p-0.5 bg-ui-bg-subtle border border-ui-border-base rounded-lg gap-0.5">
+            <button
+              type="button"
+              onClick={() => (onSelectDirection ? onSelectDirection("TB") : onToggleDirection())}
+              className={`px-2 py-0.5 text-xs font-medium rounded-md transition-all ${
+                direction === "TB"
+                  ? "bg-ui-bg-base text-ui-fg-base shadow-xs font-semibold"
+                  : "text-ui-fg-muted hover:text-ui-fg-base"
+              }`}
+              title="Vertical Tree Layout (Default)"
+            >
+              ⬇ Vertical
+            </button>
+            <button
+              type="button"
+              onClick={() => (onSelectDirection ? onSelectDirection("LR") : onToggleDirection())}
+              className={`px-2 py-0.5 text-xs font-medium rounded-md transition-all ${
+                direction === "LR"
+                  ? "bg-ui-bg-base text-ui-fg-base shadow-xs font-semibold"
+                  : "text-ui-fg-muted hover:text-ui-fg-base"
+              }`}
+              title="Mind Map Layout (Horizontal)"
+            >
+              ➡ Mind Map
+            </button>
+          </div>
         </div>
 
         <div className="relative w-36 sm:w-44">
@@ -178,6 +200,22 @@ export const CanvasDock: React.FC<CanvasDockProps> = ({
         )}
 
         <div className="flex items-center gap-1 border-l border-ui-border-base pl-2.5">
+          <button
+            type="button"
+            title="Zoom In"
+            onClick={onZoomIn}
+            className="w-5 h-5 flex items-center justify-center text-xs font-bold text-ui-fg-subtle hover:text-ui-fg-base hover:bg-ui-bg-subtle rounded transition-colors"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            title="Zoom Out"
+            onClick={onZoomOut}
+            className="w-5 h-5 flex items-center justify-center text-xs font-bold text-ui-fg-subtle hover:text-ui-fg-base hover:bg-ui-bg-subtle rounded transition-colors"
+          >
+            −
+          </button>
           <button
             type="button"
             title="Fit View (Center)"

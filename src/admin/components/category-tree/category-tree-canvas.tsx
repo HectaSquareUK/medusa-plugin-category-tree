@@ -357,6 +357,7 @@ const CanvasInner: React.FC = () => {
           onSelectStorefront={setSelectedStorefront}
           direction={direction}
           onToggleDirection={() => setDirection((d) => (d === "TB" ? "LR" : "TB"))}
+          onSelectDirection={(dir) => setDirection(dir)}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onExpandAll={handleExpandAll}
@@ -407,12 +408,12 @@ const CanvasInner: React.FC = () => {
         <Background color="#cbd5e1" gap={20} size={1.25} />
         <Controls
           showInteractive={false}
-          className="!bottom-4 !left-4 !bg-white/90 dark:!bg-neutral-900/90 !backdrop-blur-md !border !border-ui-border-base !rounded-xl !shadow-md !overflow-hidden"
+          className="!bottom-4 !left-4 !bg-[#18181b] !border !border-neutral-700 !rounded-xl !shadow-2xl !overflow-hidden [&_.react-flow\_\_controls-button]:!bg-[#18181b] [&_.react-flow\_\_controls-button]:!border-b [&_.react-flow\_\_controls-button]:!border-neutral-800 [&_.react-flow\_\_controls-button:hover]:!bg-[#27272a] [&_.react-flow\_\_controls-button_svg]:!fill-white [&_.react-flow\_\_controls-button_svg]:!stroke-white [&_.react-flow\_\_controls-button_path]:!fill-white"
         />
         <MiniMap
           nodeColor={() => "var(--bg-interactive, #3b82f6)"}
-          maskColor="rgba(0, 0, 0, 0.08)"
-          className="!bottom-4 !right-4 !bg-white/90 dark:!bg-neutral-900/90 !backdrop-blur-md !border !border-ui-border-base !rounded-xl !shadow-md !overflow-hidden"
+          maskColor="rgba(0, 0, 0, 0.25)"
+          className="!bottom-4 !right-4 !bg-[#18181b]/95 !backdrop-blur-md !border !border-neutral-700 !rounded-xl !shadow-xl !overflow-hidden"
           zoomable
           pannable
         />

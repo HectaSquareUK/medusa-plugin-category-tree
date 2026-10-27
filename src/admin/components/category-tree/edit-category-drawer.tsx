@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
 import {
   Button,
   Drawer,
@@ -9,7 +9,7 @@ import {
   Textarea,
   toast,
 } from "@medusajs/ui"
-import { Trash, Plus, ArrowUpRightMicro, ArrowsPointingOut } from "@medusajs/icons"
+import { Trash, Plus, ArrowUpRightMicro, ArrowsPointingOut, ArrowDownTray } from "@medusajs/icons"
 import { CategoryTreeNode, SalesChannelInfo } from "./types"
 import { CategoryProductsManager } from "./category-products-manager"
 import { sdk } from "../../lib/sdk"
@@ -66,6 +66,11 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
+  // Media upload & gallery state
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [categoryImages, setCategoryImages] = useState<Array<{ id?: string; url: string; type?: string }>>([])
+
   useEffect(() => {
     if (category) {
       setName(category.name || "")
@@ -88,8 +93,141 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
       }
       setYoutubeUrls(urls)
       setActiveTab("general")
+
+      // Load category media from backend
+      loadCategoryImages(category.id, category.image_url || meta?.thumbnail || meta?.image)
     }
   }, [category, salesChannels])
+
+  // Load existing category media gallery
+  const loadCategoryImages = useCallback(async (catId: string, currentImageUrl?: string) => {
+    try {
+      const res = await sdk.client.fetch<{ category_images?: any[] }>(
+        `/admin/categories/${catId}/images`
+      )
+      if (res?.category_images && Array.isArray(res.category_images) && res.category_images.length > 0) {
+        setCategoryImages(res.category_images)
+        const thumb = res.category_images.find((img) => img.type === "thumbnail")
+        if (thumb?.url) {
+          setImageUrl(thumb.url)
+        }
+        return
+      }
+    } catch {
+      // Endpoint fallback
+    }
+
+    if (currentImageUrl) {
+      setCategoryImages([{ url: currentImageUrl, type: "thumbnail" }])
+    } else {
+      setCategoryImages([])
+    }
+  }, [])
+
+  // Universal S3/Storage Media Upload Handler (works with AWS S3, MinIO, Cloudflare R2, Local)
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setIsUploading(true)
+    try {
+      const fileList = Array.from(files)
+      // Calls standard Medusa File Module API (delegates to configured S3 provider in medusa-config.js)
+      const res = await sdk.admin.upload.create({ files: fileList })
+      const uploadedFiles = res.files || []
+      if (uploadedFiles.length === 0) {
+        throw new Error("No files returned from upload service")
+      }
+
+      const firstUrl = uploadedFiles[0].url
+      if (!imageUrl) {
+        setImageUrl(firstUrl)
+      }
+
+      // If backend has custom category images endpoint, save them there too
+      try {
+        await sdk.client.fetch(`/admin/categories/${category.id}/images`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: {
+            images: uploadedFiles.map((f, i) => ({
+              url: f.url,
+              type: i === 0 && !imageUrl ? "thumbnail" : "image",
+            })),
+          },
+        })
+        await loadCategoryImages(category.id, firstUrl)
+      } catch {
+        // Fallback for standard stores: update local gallery state
+        setCategoryImages((prev) => [
+          ...prev,
+          ...uploadedFiles.map((f, i) => ({
+            url: f.url,
+            type: i === 0 && !imageUrl ? "thumbnail" : "image",
+          })),
+        ])
+      }
+
+      toast.success(`${uploadedFiles.length} image(s) uploaded successfully`)
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to upload image")
+    } finally {
+      setIsUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
+
+  // Set selected image as Category Thumbnail
+  const handleSetThumbnail = async (img: { id?: string; url: string }) => {
+    setImageUrl(img.url)
+    if (img.id) {
+      try {
+        await sdk.client.fetch(`/admin/categories/${category.id}/images/batch`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: {
+            updates: [{ id: img.id, type: "thumbnail" }],
+          },
+        })
+        await loadCategoryImages(category.id, img.url)
+      } catch {
+        setCategoryImages((prev) =>
+          prev.map((item) => ({
+            ...item,
+            type: item.url === img.url ? "thumbnail" : "image",
+          }))
+        )
+      }
+    } else {
+      setCategoryImages((prev) =>
+        prev.map((item) => ({
+          ...item,
+          type: item.url === img.url ? "thumbnail" : "image",
+        }))
+      )
+    }
+    toast.success("Designated as category thumbnail")
+  }
+
+  // Delete category image
+  const handleDeleteImage = async (img: { id?: string; url: string }) => {
+    if (img.id) {
+      try {
+        await sdk.client.fetch(`/admin/categories/${category.id}/images/batch`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: {
+            ids: [img.id],
+          },
+        })
+      } catch {
+        // Fallback
+      }
+    }
+    setCategoryImages((prev) => prev.filter((i) => i.url !== img.url))
+    if (imageUrl === img.url) {
+      setImageUrl("")
+    }
+    toast.info("Image removed")
+  }
 
   if (!category) return null
 
@@ -460,29 +598,140 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-1.5 pt-3 border-t border-ui-border-base">
-                  <Label htmlFor="edit-image" className="text-xs font-semibold">
-                    Category Thumbnail / Image URL
-                  </Label>
-                  <Input
-                    id="edit-image"
-                    size="small"
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                    placeholder="https://example.com/category-image.jpg"
+                {/* Category Media / Images Upload & Gallery */}
+                <div className="flex flex-col gap-3 pt-3 border-t border-ui-border-base">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs font-semibold">Category Media</Label>
+                      <Text size="xsmall" className="text-ui-fg-muted">
+                        Upload category thumbnails and banners. Automatically handled by your configured S3 or storage provider.
+                      </Text>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-ui-bg-base hover:bg-ui-bg-subtle text-ui-fg-base border border-ui-border-base rounded-lg shadow-2xs transition-colors cursor-pointer"
+                    >
+                      <ArrowDownTray className="w-3.5 h-3.5" />
+                      <span>{isUploading ? "Uploading…" : "Upload Media"}</span>
+                    </button>
+                  </div>
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+                    onChange={(e) => handleFileUpload(e.target.files)}
+                    className="hidden"
                   />
-                  {imageUrl && (
-                    <div className="mt-2 w-24 h-24 rounded-xl overflow-hidden border border-ui-border-base bg-ui-bg-subtle shadow-xs">
-                      <img
-                        src={imageUrl}
-                        alt="Category Preview"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          ;(e.target as any).style.display = "none"
-                        }}
-                      />
+
+                  {/* Drag and Drop Upload Zone */}
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      if (!isUploading) handleFileUpload(e.dataTransfer.files)
+                    }}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-ui-border-strong hover:border-ui-border-interactive rounded-xl p-6 flex flex-col items-center justify-center gap-2 bg-ui-bg-subtle/30 hover:bg-ui-bg-subtle/60 transition-colors cursor-pointer text-center"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-ui-bg-base border border-ui-border-base flex items-center justify-center text-ui-fg-subtle shadow-2xs">
+                      <ArrowDownTray className="w-5 h-5" />
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs font-semibold text-ui-fg-base">
+                        {isUploading ? "Uploading to storage…" : "Click to upload or drag & drop images"}
+                      </span>
+                      <span className="text-[11px] text-ui-fg-muted">
+                        PNG, JPG, WEBP, GIF, SVG up to 10MB
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Uploaded Images Gallery */}
+                  {categoryImages.length > 0 && (
+                    <div className="flex flex-col gap-2 mt-2">
+                      <Label className="text-xs font-medium text-ui-fg-muted">
+                        Uploaded Images ({categoryImages.length})
+                      </Label>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                        {categoryImages.map((img, idx) => {
+                          const isThumbnail = img.type === "thumbnail" || img.url === imageUrl
+                          return (
+                            <div
+                              key={img.id || idx}
+                              className={`group relative aspect-square rounded-xl overflow-hidden border bg-ui-bg-base transition-all shadow-xs ${
+                                isThumbnail
+                                  ? "ring-2 ring-blue-500 border-transparent"
+                                  : "border-ui-border-base hover:border-ui-border-strong"
+                              }`}
+                            >
+                              <img
+                                src={img.url}
+                                alt="Category Media"
+                                className="w-full h-full object-cover"
+                              />
+
+                              {isThumbnail && (
+                                <div className="absolute top-1.5 left-1.5 bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs">
+                                  ★ Thumbnail
+                                </div>
+                              )}
+
+                              {/* Hover Action Overlay */}
+                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 p-1.5">
+                                {!isThumbnail && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      handleSetThumbnail(img)
+                                    }}
+                                    className="px-2 py-0.5 bg-white text-neutral-900 rounded text-[10px] font-semibold hover:bg-neutral-100 transition-colors shadow-xs"
+                                  >
+                                    Set Thumbnail
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    handleDeleteImage(img)
+                                  }}
+                                  className="p-1 bg-rose-600 text-white rounded hover:bg-rose-700 transition-colors"
+                                  title="Remove image"
+                                >
+                                  <Trash className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
                   )}
+
+                  {/* Manual URL input fallback */}
+                  <div className="flex flex-col gap-1 mt-1 pt-2 border-t border-ui-border-base/50">
+                    <Label htmlFor="edit-image" className="text-[11px] text-ui-fg-muted">
+                      Or paste an external image URL
+                    </Label>
+                    <Input
+                      id="edit-image"
+                      size="small"
+                      value={imageUrl}
+                      onChange={(e) => setImageUrl(e.target.value)}
+                      placeholder="https://example.com/category-image.jpg"
+                    />
+                  </div>
                 </div>
               </div>
             )}
