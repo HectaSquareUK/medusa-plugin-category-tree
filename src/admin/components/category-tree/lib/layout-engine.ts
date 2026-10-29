@@ -1,4 +1,5 @@
 import { Node, Edge, Position } from "@xyflow/react"
+import { compareCategories } from "./tree-state"
 
 export const CARD_WIDTH = 270
 export const CARD_HEIGHT = 86
@@ -54,19 +55,19 @@ export function computeTreeLayout(
   })
 
   // Identify roots (nodes with no incoming edge in the visible graph)
-  const rootNodes = nodes.filter((n) => !parentMap.has(n.id))
-
-  // Sort children by their category rank
-  const getRank = (id: string): number => {
-    const raw = (nodeMap.get(id)?.data as any)?.category?.rank
-    return typeof raw === "number" ? raw : 0
-  }
+  const rootNodes = nodes.filter((n) => !parentMap.has(n.id)).sort((a, b) => {
+    const catA = (a.data as any)?.category || { id: a.id }
+    const catB = (b.data as any)?.category || { id: b.id }
+    return compareCategories(catA, catB)
+  })
 
   function buildTree(id: string, depth: number): TreeLayoutNode {
     const rawNode = nodeMap.get(id)!
-    const childIds = (childrenMap.get(id) || []).sort(
-      (a, b) => getRank(a) - getRank(b) || a.localeCompare(b)
-    )
+    const childIds = (childrenMap.get(id) || []).sort((aId, bId) => {
+      const catA = (nodeMap.get(aId)?.data as any)?.category || { id: aId }
+      const catB = (nodeMap.get(bId)?.data as any)?.category || { id: bId }
+      return compareCategories(catA, catB)
+    })
 
     const children = childIds.map((childId) => buildTree(childId, depth + 1))
 
@@ -129,8 +130,6 @@ export function computeTreeLayout(
     treeNode.primaryCoord = centerOfChildren
   }
 
-  // Sort roots by their rank
-  rootNodes.sort((a, b) => getRank(a.id) - getRank(b.id) || a.id.localeCompare(b.id))
 
   const positionedNodes: Node[] = []
   let globalOffset = 0

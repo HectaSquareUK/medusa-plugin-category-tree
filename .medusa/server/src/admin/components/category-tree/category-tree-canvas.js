@@ -114,10 +114,46 @@ const CanvasInner = () => {
         });
     }, [selectedNodeIds]);
     const handleMoveSiblingUp = (0, react_1.useCallback)((id) => {
-        setCategories((prev) => (0, tree_state_1.moveSiblingRank)(prev, id, "up"));
+        setCategories((prev) => {
+            const { nextCategories, siblingMoves } = (0, tree_state_1.moveSiblingRank)(prev, id, "up");
+            if (siblingMoves.length > 0) {
+                // AAA Realtime: Immediately auto-persist contiguous ranks to backend in background
+                sdk_1.sdk.client
+                    .fetch("/admin/category-tree/reorder", {
+                    method: "POST",
+                    body: { moves: siblingMoves },
+                })
+                    .then(() => {
+                    setOriginalCategories([...nextCategories]);
+                })
+                    .catch((err) => {
+                    console.error("Failed to auto-save sibling rank:", err);
+                    ui_1.toast.error("Failed to save ranking: " + (err.message || "Unknown error"));
+                });
+            }
+            return nextCategories;
+        });
     }, []);
     const handleMoveSiblingDown = (0, react_1.useCallback)((id) => {
-        setCategories((prev) => (0, tree_state_1.moveSiblingRank)(prev, id, "down"));
+        setCategories((prev) => {
+            const { nextCategories, siblingMoves } = (0, tree_state_1.moveSiblingRank)(prev, id, "down");
+            if (siblingMoves.length > 0) {
+                // AAA Realtime: Immediately auto-persist contiguous ranks to backend in background
+                sdk_1.sdk.client
+                    .fetch("/admin/category-tree/reorder", {
+                    method: "POST",
+                    body: { moves: siblingMoves },
+                })
+                    .then(() => {
+                    setOriginalCategories([...nextCategories]);
+                })
+                    .catch((err) => {
+                    console.error("Failed to auto-save sibling rank:", err);
+                    ui_1.toast.error("Failed to save ranking: " + (err.message || "Unknown error"));
+                });
+            }
+            return nextCategories;
+        });
     }, []);
     const handleAddChild = (0, react_1.useCallback)((parent) => {
         setCreateParentCategory(parent);

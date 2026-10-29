@@ -52,6 +52,20 @@ export function computeTiers(
   return tierMap
 }
 
+export function compareCategories(
+  a: { rank?: number; name?: string; id?: string },
+  b: { rank?: number; name?: string; id?: string }
+): number {
+  const rankA = typeof a.rank === "number" ? a.rank : 9999
+  const rankB = typeof b.rank === "number" ? b.rank : 9999
+  if (rankA !== rankB) return rankA - rankB
+  const nameA = (a.name || "").trim()
+  const nameB = (b.name || "").trim()
+  const nameComp = nameA.localeCompare(nameB)
+  if (nameComp !== 0) return nameComp
+  return (a.id || "").localeCompare(b.id || "")
+}
+
 export function computeSiblingRanks(
   categories: CategoryTreeNode[]
 ): Map<string, { rankNum: number; superscript: string }> {
@@ -67,7 +81,7 @@ export function computeSiblingRanks(
   const result = new Map<string, { rankNum: number; superscript: string }>()
 
   for (const [, list] of grouped.entries()) {
-    list.sort((a, b) => a.rank - b.rank)
+    list.sort(compareCategories)
     list.forEach((item, index) => {
       const rankNum = index + 1
       result.set(item.id, {
@@ -236,44 +250,56 @@ export function computeBranchColors(
 
 /**
  * Swaps sibling ranking (up or down). Modifies rank property among siblings
- * and returns a new categories array ready for preview and commit.
+ * and returns a new categories array ready for preview and commit, along with
+ * explicit contiguous moves for all siblings in the group.
  */
 export function moveSiblingRank(
   categories: CategoryTreeNode[],
   targetId: string,
   direction: "up" | "down"
-): CategoryTreeNode[] {
+): {
+  nextCategories: CategoryTreeNode[]
+  siblingMoves: Array<{ id: string; parent_category_id: string | null; rank: number }>
+} {
   const target = categories.find((c) => c.id === targetId)
-  if (!target) return categories
+  if (!target) return { nextCategories: categories, siblingMoves: [] }
 
   const parentId = target.parent_category_id || null
   const siblings = categories
     .filter((c) => (c.parent_category_id || null) === parentId)
-    .sort((a, b) => a.rank - b.rank)
+    .sort(compareCategories)
 
   const currentIndex = siblings.findIndex((s) => s.id === targetId)
-  if (currentIndex === -1) return categories
+  if (currentIndex === -1) return { nextCategories: categories, siblingMoves: [] }
 
   const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1
-  if (targetIndex < 0 || targetIndex >= siblings.length) return categories
+  if (targetIndex < 0 || targetIndex >= siblings.length) return { nextCategories: categories, siblingMoves: [] }
 
-  const adjacent = siblings[targetIndex]
-  // Normalize ranks if they are identical or uninitialized
+  // Swap target and adjacent within ordered sibling list
+  const reordered = [...siblings]
+  const temp = reordered[currentIndex]
+  reordered[currentIndex] = reordered[targetIndex]
+  reordered[targetIndex] = temp
+
+  // Normalize contiguous ranks: 0, 1, 2, 3...
   const updatedRanks = new Map<string, number>()
-  siblings.forEach((s, idx) => {
-    updatedRanks.set(s.id, idx * 10)
+  const siblingMoves: Array<{ id: string; parent_category_id: string | null; rank: number }> = []
+
+  reordered.forEach((s, idx) => {
+    updatedRanks.set(s.id, idx)
+    siblingMoves.push({
+      id: s.id,
+      parent_category_id: parentId,
+      rank: idx,
+    })
   })
 
-  // Swap target and adjacent
-  const targetNewRank = targetIndex * 10
-  const adjacentNewRank = currentIndex * 10
-  updatedRanks.set(target.id, targetNewRank)
-  updatedRanks.set(adjacent.id, adjacentNewRank)
-
-  return categories.map((c) => {
+  const nextCategories = categories.map((c) => {
     if (updatedRanks.has(c.id)) {
       return { ...c, rank: updatedRanks.get(c.id)! }
     }
     return c
   })
+
+  return { nextCategories, siblingMoves }
 }

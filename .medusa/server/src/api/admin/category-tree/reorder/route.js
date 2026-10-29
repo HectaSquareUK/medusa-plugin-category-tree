@@ -10,10 +10,10 @@ const POST = async (req, res) => {
     }
     const { moves } = parsed.data;
     const productModule = req.scope.resolve(utils_1.Modules.PRODUCT);
-    const existing = await productModule.listProductCategories({}, { select: ["id", "parent_category_id", "rank"], take: null });
+    const existing = await productModule.listProductCategories({}, { select: ["id", "parent_category_id", "rank", "metadata"], take: null });
     const existingMap = new Map(existing.map((c) => [
         c.id,
-        { parent_category_id: c.parent_category_id, rank: c.rank },
+        { parent_category_id: c.parent_category_id, rank: c.rank, metadata: c.metadata },
     ]));
     const simulatedParents = new Map();
     for (const [id, data] of existingMap.entries()) {
@@ -44,9 +44,15 @@ const POST = async (req, res) => {
     const applied = [];
     try {
         for (const m of moves) {
+            const prevMeta = existingMap.get(m.id)?.metadata || {};
             await productModule.updateProductCategories(m.id, {
                 parent_category_id: m.parent_category_id,
                 rank: m.rank,
+                metadata: {
+                    ...prevMeta,
+                    rank: m.rank,
+                    sibling_rank: m.rank + 1,
+                },
             });
             applied.push(m.id);
         }

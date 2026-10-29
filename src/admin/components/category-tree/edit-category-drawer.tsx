@@ -411,8 +411,13 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
     }
   }
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e && e.preventDefault) e.preventDefault()
+  const handleSubmit = async (eOrClose?: React.FormEvent | boolean, closeAfter: boolean = false) => {
+    let shouldClose = closeAfter
+    if (typeof eOrClose === "boolean") {
+      shouldClose = eOrClose
+    } else if (eOrClose && (eOrClose as any).preventDefault) {
+      (eOrClose as any).preventDefault()
+    }
     if (!name.trim()) {
       toast.error("Category name is required")
       return
@@ -468,7 +473,9 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
 
       toast.success("Category updated successfully")
       onSuccess(updated)
-      onOpenChange(false)
+      if (shouldClose) {
+        onOpenChange(false)
+      }
     } catch (err: any) {
       toast.error(err?.message || "Failed to update category")
     } finally {
@@ -848,7 +855,7 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
                               <img
                                 src={img.url}
                                 alt="Category Media"
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain p-1.5"
                               />
 
                               {isThumbnail && (
@@ -1036,7 +1043,13 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
               type="button"
               variant="secondary"
               size="small"
-              onClick={() => onOpenChange(false)}
+              onClick={() => {
+                if (name.trim()) {
+                  handleSubmit(true)
+                } else {
+                  onOpenChange(false)
+                }
+              }}
               disabled={isSubmitting || isDeleting}
             >
               Close
@@ -1044,7 +1057,7 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
             <Button
               type="button"
               size="small"
-              onClick={() => handleSubmit()}
+              onClick={() => handleSubmit(false)}
               isLoading={isSubmitting}
               disabled={isSubmitting || !name.trim() || isDeleting}
             >

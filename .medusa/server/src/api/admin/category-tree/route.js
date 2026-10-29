@@ -59,6 +59,19 @@ const GET = async (req, res) => {
         });
         categories = catDataFallback || [];
     }
+    // Enforce universal deterministic sorting (rank ASC, name ASC, id ASC)
+    categories.sort((a, b) => {
+        const rankA = typeof a.rank === "number" ? a.rank : 9999;
+        const rankB = typeof b.rank === "number" ? b.rank : 9999;
+        if (rankA !== rankB)
+            return rankA - rankB;
+        const nameA = (a.name || "").trim();
+        const nameB = (b.name || "").trim();
+        const nameComp = nameA.localeCompare(nameB);
+        if (nameComp !== 0)
+            return nameComp;
+        return (a.id || "").localeCompare(b.id || "");
+    });
     const allChannelIds = salesChannels.map((sc) => sc.id);
     const enriched = categories.map((cat) => {
         const images = Array.isArray(cat.product_category_image)

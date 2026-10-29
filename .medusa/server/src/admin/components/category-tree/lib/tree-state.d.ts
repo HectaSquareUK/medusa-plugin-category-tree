@@ -2,6 +2,15 @@ import { Node, Edge } from "@xyflow/react";
 import { CategoryTreeNode, CategoryMoveItem } from "../types";
 export declare function toSuperscript(num: number): string;
 export declare function computeTiers(categories: CategoryTreeNode[]): Map<string, number>;
+export declare function compareCategories(a: {
+    rank?: number;
+    name?: string;
+    id?: string;
+}, b: {
+    rank?: number;
+    name?: string;
+    id?: string;
+}): number;
 export declare function computeSiblingRanks(categories: CategoryTreeNode[]): Map<string, {
     rankNum: number;
     superscript: string;
@@ -24,6 +33,14 @@ export declare const BRANCH_PALETTE: {
 export declare function computeBranchColors(categories: CategoryTreeNode[]): Map<string, string>;
 /**
  * Swaps sibling ranking (up or down). Modifies rank property among siblings
- * and returns a new categories array ready for preview and commit.
+ * and returns a new categories array ready for preview and commit, along with
+ * explicit contiguous moves for all siblings in the group.
  */
-export declare function moveSiblingRank(categories: CategoryTreeNode[], targetId: string, direction: "up" | "down"): CategoryTreeNode[];
+export declare function moveSiblingRank(categories: CategoryTreeNode[], targetId: string, direction: "up" | "down"): {
+    nextCategories: CategoryTreeNode[];
+    siblingMoves: Array<{
+        id: string;
+        parent_category_id: string | null;
+        rank: number;
+    }>;
+};

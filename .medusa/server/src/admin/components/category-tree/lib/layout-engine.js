@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.computeDagreLayout = exports.CARD_HEIGHT = exports.CARD_WIDTH = void 0;
 exports.computeTreeLayout = computeTreeLayout;
 const react_1 = require("@xyflow/react");
+const tree_state_1 = require("./tree-state");
 exports.CARD_WIDTH = 270;
 exports.CARD_HEIGHT = 86;
 /**
@@ -32,15 +33,18 @@ function computeTreeLayout(nodes, edges, options = {}) {
         }
     });
     // Identify roots (nodes with no incoming edge in the visible graph)
-    const rootNodes = nodes.filter((n) => !parentMap.has(n.id));
-    // Sort children by their category rank
-    const getRank = (id) => {
-        const raw = nodeMap.get(id)?.data?.category?.rank;
-        return typeof raw === "number" ? raw : 0;
-    };
+    const rootNodes = nodes.filter((n) => !parentMap.has(n.id)).sort((a, b) => {
+        const catA = a.data?.category || { id: a.id };
+        const catB = b.data?.category || { id: b.id };
+        return (0, tree_state_1.compareCategories)(catA, catB);
+    });
     function buildTree(id, depth) {
         const rawNode = nodeMap.get(id);
-        const childIds = (childrenMap.get(id) || []).sort((a, b) => getRank(a) - getRank(b) || a.localeCompare(b));
+        const childIds = (childrenMap.get(id) || []).sort((aId, bId) => {
+            const catA = nodeMap.get(aId)?.data?.category || { id: aId };
+            const catB = nodeMap.get(bId)?.data?.category || { id: bId };
+            return (0, tree_state_1.compareCategories)(catA, catB);
+        });
         const children = childIds.map((childId) => buildTree(childId, depth + 1));
         return {
             id,
@@ -87,8 +91,6 @@ function computeTreeLayout(nodes, edges, options = {}) {
         const centerOfChildren = (firstChild.primaryCoord + lastChild.primaryCoord) / 2;
         treeNode.primaryCoord = centerOfChildren;
     }
-    // Sort roots by their rank
-    rootNodes.sort((a, b) => getRank(a.id) - getRank(b.id) || a.id.localeCompare(b.id));
     const positionedNodes = [];
     let globalOffset = 0;
     rootNodes.forEach((root) => {

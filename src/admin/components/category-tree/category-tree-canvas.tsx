@@ -149,11 +149,47 @@ const CanvasInner: React.FC = () => {
   }, [selectedNodeIds])
 
   const handleMoveSiblingUp = useCallback((id: string) => {
-    setCategories((prev) => moveSiblingRank(prev, id, "up"))
+    setCategories((prev) => {
+      const { nextCategories, siblingMoves } = moveSiblingRank(prev, id, "up")
+      if (siblingMoves.length > 0) {
+        // AAA Realtime: Immediately auto-persist contiguous ranks to backend in background
+        sdk.client
+          .fetch("/admin/category-tree/reorder", {
+            method: "POST",
+            body: { moves: siblingMoves },
+          })
+          .then(() => {
+            setOriginalCategories([...nextCategories])
+          })
+          .catch((err: any) => {
+            console.error("Failed to auto-save sibling rank:", err)
+            toast.error("Failed to save ranking: " + (err.message || "Unknown error"))
+          })
+      }
+      return nextCategories
+    })
   }, [])
 
   const handleMoveSiblingDown = useCallback((id: string) => {
-    setCategories((prev) => moveSiblingRank(prev, id, "down"))
+    setCategories((prev) => {
+      const { nextCategories, siblingMoves } = moveSiblingRank(prev, id, "down")
+      if (siblingMoves.length > 0) {
+        // AAA Realtime: Immediately auto-persist contiguous ranks to backend in background
+        sdk.client
+          .fetch("/admin/category-tree/reorder", {
+            method: "POST",
+            body: { moves: siblingMoves },
+          })
+          .then(() => {
+            setOriginalCategories([...nextCategories])
+          })
+          .catch((err: any) => {
+            console.error("Failed to auto-save sibling rank:", err)
+            toast.error("Failed to save ranking: " + (err.message || "Unknown error"))
+          })
+      }
+      return nextCategories
+    })
   }, [])
 
   const handleAddChild = useCallback((parent: CategoryTreeNode) => {

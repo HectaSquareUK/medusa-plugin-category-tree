@@ -362,9 +362,14 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
             ui_1.toast.info("Video removed (remember to save)");
         }
     };
-    const handleSubmit = async (e) => {
-        if (e && e.preventDefault)
-            e.preventDefault();
+    const handleSubmit = async (eOrClose, closeAfter = false) => {
+        let shouldClose = closeAfter;
+        if (typeof eOrClose === "boolean") {
+            shouldClose = eOrClose;
+        }
+        else if (eOrClose && eOrClose.preventDefault) {
+            eOrClose.preventDefault();
+        }
         if (!name.trim()) {
             ui_1.toast.error("Category name is required");
             return;
@@ -413,7 +418,9 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
             };
             ui_1.toast.success("Category updated successfully");
             onSuccess(updated);
-            onOpenChange(false);
+            if (shouldClose) {
+                onOpenChange(false);
+            }
         }
         catch (err) {
             ui_1.toast.error(err?.message || "Failed to update category");
@@ -473,7 +480,7 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
                                                                     ? "ring-2 ring-blue-500 border-transparent"
                                                                     : isBanner
                                                                         ? "ring-2 ring-emerald-500 border-transparent"
-                                                                        : "border-ui-border-base hover:border-ui-border-strong"}`, children: [(0, jsx_runtime_1.jsx)("img", { src: img.url, alt: "Category Media", className: "w-full h-full object-cover" }), isThumbnail && ((0, jsx_runtime_1.jsx)("div", { className: "absolute top-1.5 left-1.5 bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs", children: "\u2605 Thumbnail" })), !isThumbnail && isBanner && ((0, jsx_runtime_1.jsx)("div", { className: "absolute top-1.5 left-1.5 bg-emerald-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs", children: "\uD83D\uDDBC\uFE0F Hero Banner" })), (0, jsx_runtime_1.jsxs)("div", { className: "absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 p-1.5", children: [!isThumbnail && ((0, jsx_runtime_1.jsx)("button", { type: "button", onClick: (e) => {
+                                                                        : "border-ui-border-base hover:border-ui-border-strong"}`, children: [(0, jsx_runtime_1.jsx)("img", { src: img.url, alt: "Category Media", className: "w-full h-full object-contain p-1.5" }), isThumbnail && ((0, jsx_runtime_1.jsx)("div", { className: "absolute top-1.5 left-1.5 bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs", children: "\u2605 Thumbnail" })), !isThumbnail && isBanner && ((0, jsx_runtime_1.jsx)("div", { className: "absolute top-1.5 left-1.5 bg-emerald-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs", children: "\uD83D\uDDBC\uFE0F Hero Banner" })), (0, jsx_runtime_1.jsxs)("div", { className: "absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 p-1.5", children: [!isThumbnail && ((0, jsx_runtime_1.jsx)("button", { type: "button", onClick: (e) => {
                                                                                     e.preventDefault();
                                                                                     e.stopPropagation();
                                                                                     handleSetThumbnail(img);
@@ -500,6 +507,13 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
                                             const id = extractYouTubeVideoId(url);
                                             const thumb = id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;
                                             return ((0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col border border-ui-border-base rounded-xl overflow-hidden bg-ui-bg-subtle/40 shadow-xs", children: [(0, jsx_runtime_1.jsxs)("div", { className: "relative aspect-video bg-black/80 overflow-hidden flex items-center justify-center", children: [thumb ? ((0, jsx_runtime_1.jsx)("img", { src: thumb, alt: "YouTube Preview", className: "w-full h-full object-cover" })) : ((0, jsx_runtime_1.jsx)("span", { className: "text-xs text-white", children: "Video" })), (0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => handleRemoveYoutube(url), className: "absolute top-1.5 right-1.5 p-1 bg-black/70 hover:bg-rose-600 text-white rounded-full transition-colors cursor-pointer", title: "Remove video", children: (0, jsx_runtime_1.jsx)(icons_1.Trash, { className: "w-3 h-3" }) })] }), (0, jsx_runtime_1.jsx)("div", { className: "p-2", children: (0, jsx_runtime_1.jsx)("span", { className: "text-[10px] text-ui-fg-muted truncate block font-mono", title: url, children: url }) })] }, url));
-                                        }) }))] }))] }), (0, jsx_runtime_1.jsxs)(ui_1.Drawer.Footer, { className: "flex justify-end gap-2 px-6 py-4 border-t border-ui-border-base", children: [(0, jsx_runtime_1.jsx)(ui_1.Button, { type: "button", variant: "secondary", size: "small", onClick: () => onOpenChange(false), disabled: isSubmitting || isDeleting, children: "Close" }), (0, jsx_runtime_1.jsx)(ui_1.Button, { type: "button", size: "small", onClick: () => handleSubmit(), isLoading: isSubmitting, disabled: isSubmitting || !name.trim() || isDeleting, children: "Save Category" })] })] }) }) }));
+                                        }) }))] }))] }), (0, jsx_runtime_1.jsxs)(ui_1.Drawer.Footer, { className: "flex justify-end gap-2 px-6 py-4 border-t border-ui-border-base", children: [(0, jsx_runtime_1.jsx)(ui_1.Button, { type: "button", variant: "secondary", size: "small", onClick: () => {
+                                    if (name.trim()) {
+                                        handleSubmit(true);
+                                    }
+                                    else {
+                                        onOpenChange(false);
+                                    }
+                                }, disabled: isSubmitting || isDeleting, children: "Close" }), (0, jsx_runtime_1.jsx)(ui_1.Button, { type: "button", size: "small", onClick: () => handleSubmit(false), isLoading: isSubmitting, disabled: isSubmitting || !name.trim() || isDeleting, children: "Save Category" })] })] }) }) }));
 };
 exports.EditCategoryDrawer = EditCategoryDrawer;
