@@ -51,7 +51,7 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
         if (category) {
             setName(category.name || "");
             setHandle(category.handle || "");
-            setDescription(category.description || "");
+            setDescription(category.description || category.metadata?.description || "");
             setImageUrl(category.image_url || "");
             setRank(category.rank ?? 0);
             setIsActive(Boolean(category.is_active));
@@ -382,8 +382,10 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
             const bannerImg = categoryImages.find((img) => img.type === "banner") ||
                 (categoryImages.length > 1 ? categoryImages.find((img) => img.url !== thumbImg?.url) : null) ||
                 null;
+            const descValue = description.trim();
             const updatedMetadata = {
                 ...(currentMetadata || {}),
+                description: descValue || null,
                 sales_channels: selectedChannels,
                 youtube_urls: youtubeUrls,
                 youtube_url: youtubeUrls[0] || null,
@@ -398,7 +400,7 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
             await sdk_1.sdk.admin.productCategory.update(category.id, {
                 name: name.trim(),
                 handle: handle.trim() || undefined,
-                description: description.trim() || undefined,
+                description: descValue ? descValue : null,
                 rank: Number(rank) || 0,
                 is_active: isActive,
                 is_internal: isInternal,
@@ -408,7 +410,7 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
                 ...category,
                 name: name.trim(),
                 handle: handle.trim(),
-                description: description.trim() || null,
+                description: descValue ? descValue : null,
                 image_url: thumbImg ? thumbImg.url : "",
                 rank: Number(rank) || 0,
                 sales_channels: selectedChannels,

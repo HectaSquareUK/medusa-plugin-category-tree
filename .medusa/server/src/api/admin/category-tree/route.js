@@ -92,7 +92,7 @@ const GET = async (req, res) => {
             id: cat.id,
             name: cat.name,
             handle: cat.handle,
-            description: cat.description || null,
+            description: cat.description || cat.metadata?.description || null,
             parent_category_id: cat.parent_category_id || null,
             rank: typeof cat.rank === "number" ? cat.rank : 0,
             is_active: Boolean(cat.is_active),

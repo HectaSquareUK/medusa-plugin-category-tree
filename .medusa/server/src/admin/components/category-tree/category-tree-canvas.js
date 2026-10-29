@@ -351,6 +351,7 @@ const CanvasInner = () => {
                     setCategories((prev) => [...prev, newCat]);
                     setOriginalCategories((prev) => [...prev, newCat]);
                 } }), (0, jsx_runtime_1.jsx)(edit_category_drawer_1.EditCategoryDrawer, { open: editDrawerOpen, onOpenChange: setEditDrawerOpen, category: editingCategory, salesChannels: salesChannels, onSuccess: (updatedCat) => {
+                    setEditingCategory(updatedCat);
                     setCategories((prev) => prev.map((c) => (c.id === updatedCat.id ? updatedCat : c)));
                     setOriginalCategories((prev) => prev.map((c) => (c.id === updatedCat.id ? updatedCat : c)));
                 }, onDeleteSuccess: (deletedId) => {

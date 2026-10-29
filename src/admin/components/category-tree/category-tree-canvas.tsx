@@ -514,6 +514,7 @@ const CanvasInner: React.FC = () => {
         category={editingCategory}
         salesChannels={salesChannels}
         onSuccess={(updatedCat) => {
+          setEditingCategory(updatedCat)
           setCategories((prev) =>
             prev.map((c) => (c.id === updatedCat.id ? updatedCat : c))
           )

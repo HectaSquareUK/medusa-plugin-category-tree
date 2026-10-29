@@ -76,7 +76,7 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
     if (category) {
       setName(category.name || "")
       setHandle(category.handle || "")
-      setDescription(category.description || "")
+      setDescription(category.description || (category.metadata as any)?.description || "")
       setImageUrl(category.image_url || "")
       setRank(category.rank ?? 0)
       setIsActive(Boolean(category.is_active))
@@ -434,8 +434,11 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
         (categoryImages.length > 1 ? categoryImages.find((img) => img.url !== thumbImg?.url) : null) ||
         null
 
+      const descValue = description.trim()
+
       const updatedMetadata: Record<string, any> = {
         ...(currentMetadata || {}),
+        description: descValue || null,
         sales_channels: selectedChannels,
         youtube_urls: youtubeUrls,
         youtube_url: youtubeUrls[0] || null,
@@ -451,7 +454,7 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
       await sdk.admin.productCategory.update(category.id, {
         name: name.trim(),
         handle: handle.trim() || undefined,
-        description: description.trim() || undefined,
+        description: descValue ? descValue : null,
         rank: Number(rank) || 0,
         is_active: isActive,
         is_internal: isInternal,
@@ -462,7 +465,7 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
         ...category,
         name: name.trim(),
         handle: handle.trim(),
-        description: description.trim() || null,
+        description: descValue ? descValue : null,
         image_url: thumbImg ? thumbImg.url : "",
         rank: Number(rank) || 0,
         sales_channels: selectedChannels,
