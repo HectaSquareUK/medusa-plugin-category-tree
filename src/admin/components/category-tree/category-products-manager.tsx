@@ -10,6 +10,7 @@ import {
   MagnifyingGlass,
   CheckMini,
   Sparkles,
+  ArrowUpRightMicro,
 } from "@medusajs/icons"
 import { sdk } from "../../lib/sdk"
 
@@ -133,12 +134,15 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
   }
 
   // Sibling product ranking handlers (Move Up / Move Down)
-  const handleMoveProduct = async (index: number, direction: "up" | "down") => {
-    const targetIndex = direction === "up" ? index - 1 : index + 1
+  const handleMoveProduct = async (productId: string, direction: "up" | "down") => {
+    const currentIndex = products.findIndex((p) => p.id === productId)
+    if (currentIndex === -1) return
+
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1
     if (targetIndex < 0 || targetIndex >= products.length) return
 
     const reordered = [...products]
-    const [moved] = reordered.splice(index, 1)
+    const [moved] = reordered.splice(currentIndex, 1)
     reordered.splice(targetIndex, 0, moved)
 
     setProducts(reordered)
@@ -166,7 +170,7 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
     await persistProductConfig(currentOrder, next)
   }
 
-  // Remove products from category
+  // Remove products from category using official Medusa v2 JS SDK method
   const handleRemoveProducts = async (idsToRemove: string[]) => {
     if (idsToRemove.length === 0) return
     const msg =
@@ -177,9 +181,8 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
 
     setIsRemoving(true)
     try {
-      await sdk.client.fetch(`/admin/product-categories/${categoryId}/products`, {
-        method: "POST",
-        body: { remove: idsToRemove },
+      await sdk.admin.productCategory.updateProducts(categoryId, {
+        remove: idsToRemove,
       })
       toast.success(`Removed ${idsToRemove.length} product(s) from category`)
       setSelectedIds(new Set())
@@ -224,15 +227,15 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
     }
   }, [focusModalOpen, searchQuery, catalogPage, searchCatalog])
 
+  // Save added products using official Medusa v2 JS SDK method
   const handleSaveAddedProducts = async () => {
     const idsToAdd = Array.from(catalogSelectedIds)
     if (idsToAdd.length === 0) return
 
     setIsAdding(true)
     try {
-      await sdk.client.fetch(`/admin/product-categories/${categoryId}/products`, {
-        method: "POST",
-        body: { add: idsToAdd },
+      await sdk.admin.productCategory.updateProducts(categoryId, {
+        add: idsToAdd,
       })
       toast.success(`Added ${idsToAdd.length} product(s) to ${categoryName}`)
       setFocusModalOpen(false)
@@ -267,7 +270,11 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
         <div className="flex items-center gap-1.5 p-1 rounded-lg bg-ui-bg-subtle border border-ui-border-base">
           <button
             type="button"
-            onClick={() => setActiveView("all")}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setActiveView("all")
+            }}
             className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
               activeView === "all"
                 ? "bg-ui-bg-base text-ui-fg-base shadow-2xs font-semibold"
@@ -278,7 +285,11 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
           </button>
           <button
             type="button"
-            onClick={() => setActiveView("top_sellers")}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setActiveView("top_sellers")
+            }}
             className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
               activeView === "top_sellers"
                 ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 font-semibold"
@@ -293,10 +304,15 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
         <div className="flex items-center gap-2">
           {selectedIds.size > 0 && (
             <Button
+              type="button"
               size="small"
               variant="danger"
               disabled={isRemoving}
-              onClick={() => handleRemoveProducts(Array.from(selectedIds))}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                handleRemoveProducts(Array.from(selectedIds))
+              }}
               className="flex items-center gap-1 text-xs"
             >
               <Trash className="w-3.5 h-3.5" />
@@ -305,9 +321,12 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
           )}
 
           <Button
+            type="button"
             size="small"
             variant="secondary"
-            onClick={() => {
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
               setCatalogSelectedIds(new Set())
               setSearchQuery("")
               setCatalogPage(0)
@@ -336,9 +355,17 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
             </p>
             {activeView === "all" && (
               <Button
+                type="button"
                 size="small"
                 variant="secondary"
-                onClick={() => setFocusModalOpen(true)}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setCatalogSelectedIds(new Set())
+                  setSearchQuery("")
+                  setCatalogPage(0)
+                  setFocusModalOpen(true)
+                }}
                 className="flex items-center gap-1 text-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -412,7 +439,7 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
                             onClick={(e) => {
                               e.preventDefault()
                               e.stopPropagation()
-                              handleMoveProduct(index, "up")
+                              handleMoveProduct(p.id, "up")
                             }}
                             className="text-[9px] text-ui-fg-muted hover:text-ui-fg-base disabled:opacity-20 px-0.5 leading-none cursor-pointer"
                           >
@@ -425,7 +452,7 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
                             onClick={(e) => {
                               e.preventDefault()
                               e.stopPropagation()
-                              handleMoveProduct(index, "down")
+                              handleMoveProduct(p.id, "down")
                             }}
                             className="text-[9px] text-ui-fg-muted hover:text-ui-fg-base disabled:opacity-20 px-0.5 leading-none cursor-pointer"
                           >
@@ -435,20 +462,33 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
                       </div>
                     </td>
 
-                    {/* Product Thumbnail & Title */}
+                    {/* Product Thumbnail & Title (Clickable link to Medusa Admin product page) */}
                     <td className="py-2.5 px-3">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-9 h-9 rounded-md border border-ui-border-base overflow-hidden bg-ui-bg-subtle flex-shrink-0 flex items-center justify-center">
+                        <a
+                          href={`/app/products/${p.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-9 h-9 rounded-md border border-ui-border-base overflow-hidden bg-ui-bg-subtle flex-shrink-0 flex items-center justify-center hover:opacity-80 transition-opacity"
+                          title={`Open ${p.title} in new tab`}
+                        >
                           {p.thumbnail ? (
                             <img src={p.thumbnail} alt={p.title} className="w-full h-full object-cover" />
                           ) : (
                             <span className="text-[9px] text-ui-fg-muted">IMG</span>
                           )}
-                        </div>
+                        </a>
                         <div className="flex flex-col min-w-0">
-                          <span className="font-semibold text-ui-fg-base truncate leading-snug" title={p.title}>
-                            {p.title}
-                          </span>
+                          <a
+                            href={`/app/products/${p.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-semibold text-ui-fg-base hover:text-ui-fg-interactive truncate leading-snug hover:underline flex items-center gap-1 group/pname"
+                            title={`Open ${p.title} in new tab`}
+                          >
+                            <span className="truncate">{p.title}</span>
+                            <ArrowUpRightMicro className="w-3.5 h-3.5 text-ui-fg-muted group-hover/pname:text-ui-fg-interactive transition-colors shrink-0" />
+                          </a>
                         </div>
                       </div>
                     </td>
@@ -462,7 +502,7 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
                           e.stopPropagation()
                           handleToggleTopSeller(p.id, p.title)
                         }}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-all ${
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-all cursor-pointer ${
                           isTopSeller
                             ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700 shadow-2xs"
                             : "bg-ui-bg-subtle text-ui-fg-muted border-ui-border-base hover:text-amber-600 hover:border-amber-300"
@@ -470,7 +510,7 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
                         title={
                           isTopSeller
                             ? "Click to remove from Top Commercial Sellers"
-                            : "Click to mark as Top Commercial Seller (Reflected in Storefront 2)"
+                            : "Click to mark as Top Commercial Seller (Reflected on Storefront 2)"
                         }
                       >
                         <span>{isTopSeller ? "★" : "☆"}</span>
@@ -507,7 +547,7 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
                           e.stopPropagation()
                           handleRemoveProducts([p.id])
                         }}
-                        className="p-1 text-ui-fg-muted hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded transition-colors"
+                        className="p-1 text-ui-fg-muted hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded transition-colors cursor-pointer"
                       >
                         <Trash className="w-3.5 h-3.5" />
                       </button>
@@ -530,8 +570,12 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setFocusModalOpen(false)}
-                className="p-1.5 rounded-lg text-ui-fg-muted hover:text-ui-fg-base hover:bg-ui-bg-subtle transition-colors"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setFocusModalOpen(false)
+                }}
+                className="p-1.5 rounded-lg text-ui-fg-muted hover:text-ui-fg-base hover:bg-ui-bg-subtle transition-colors cursor-pointer"
                 title="Close (ESC)"
               >
                 <span className="text-sm font-bold">✕</span>
@@ -728,16 +772,24 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
               <button
                 type="button"
                 disabled={catalogPage === 0}
-                onClick={() => setCatalogPage((p) => Math.max(0, p - 1))}
-                className="px-2.5 py-1 text-xs rounded border border-ui-border-base bg-ui-bg-subtle hover:bg-ui-bg-base disabled:opacity-40"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setCatalogPage((p) => Math.max(0, p - 1))
+                }}
+                className="px-2.5 py-1 text-xs rounded border border-ui-border-base bg-ui-bg-subtle hover:bg-ui-bg-base disabled:opacity-40 cursor-pointer"
               >
                 Prev
               </button>
               <button
                 type="button"
                 disabled={(catalogPage + 1) * PAGE_SIZE >= catalogTotalCount}
-                onClick={() => setCatalogPage((p) => p + 1)}
-                className="px-2.5 py-1 text-xs rounded border border-ui-border-base bg-ui-bg-subtle hover:bg-ui-bg-base disabled:opacity-40"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setCatalogPage((p) => p + 1)
+                }}
+                className="px-2.5 py-1 text-xs rounded border border-ui-border-base bg-ui-bg-subtle hover:bg-ui-bg-base disabled:opacity-40 cursor-pointer"
               >
                 Next
               </button>
@@ -745,17 +797,27 @@ export const CategoryProductsManager: React.FC<CategoryProductsManagerProps> = (
               <div className="h-4 w-[1px] bg-ui-border-base mx-1" />
 
               <Button
+                type="button"
                 size="small"
                 variant="secondary"
-                onClick={() => setFocusModalOpen(false)}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setFocusModalOpen(false)
+                }}
               >
                 Cancel
               </Button>
               <Button
+                type="button"
                 size="small"
                 variant="primary"
                 disabled={catalogSelectedIds.size === 0 || isAdding}
-                onClick={handleSaveAddedProducts}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleSaveAddedProducts()
+                }}
                 className="flex items-center gap-1 text-xs min-w-[70px] justify-center"
               >
                 <CheckMini className="w-3.5 h-3.5" />

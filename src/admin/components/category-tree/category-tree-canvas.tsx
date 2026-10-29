@@ -51,7 +51,7 @@ const CanvasInner: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
-  const [direction, setDirection] = useState<"TB" | "LR">("TB")
+  const [direction, setDirection] = useState<"TB" | "LR">("LR")
   const [selectedStorefront, setSelectedStorefront] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
@@ -408,8 +408,50 @@ const CanvasInner: React.FC = () => {
         <Background color="#cbd5e1" gap={20} size={1.25} />
         <Controls
           showInteractive={false}
-          className="!bottom-4 !left-4 !bg-[#18181b] !border !border-neutral-700 !rounded-xl !shadow-2xl !overflow-hidden [&_.react-flow\_\_controls-button]:!bg-[#18181b] [&_.react-flow\_\_controls-button]:!border-b [&_.react-flow\_\_controls-button]:!border-neutral-800 [&_.react-flow\_\_controls-button:hover]:!bg-[#27272a] [&_.react-flow\_\_controls-button_svg]:!fill-white [&_.react-flow\_\_controls-button_svg]:!stroke-white [&_.react-flow\_\_controls-button_path]:!fill-white"
+          className="!bottom-4 !left-4"
         />
+        <style>{`
+          .react-flow__controls {
+            background: #ffffff !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 9999px !important;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2) !important;
+            padding: 3px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 2px !important;
+            overflow: hidden !important;
+          }
+          .react-flow__controls-button {
+            background: #ffffff !important;
+            border: none !important;
+            border-bottom: 1px solid #f1f5f9 !important;
+            border-radius: 9999px !important;
+            width: 28px !important;
+            height: 28px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+            transition: background 0.15s ease !important;
+          }
+          .react-flow__controls-button:last-child {
+            border-bottom: none !important;
+          }
+          .react-flow__controls-button:hover {
+            background: #f3f4f6 !important;
+          }
+          .react-flow__controls-button svg {
+            fill: #000000 !important;
+            stroke: #000000 !important;
+            color: #000000 !important;
+          }
+          .react-flow__controls-button svg path {
+            fill: #000000 !important;
+            stroke: #000000 !important;
+            color: #000000 !important;
+          }
+        `}</style>
         <MiniMap
           nodeColor={() => "var(--bg-interactive, #3b82f6)"}
           maskColor="rgba(0, 0, 0, 0.25)"

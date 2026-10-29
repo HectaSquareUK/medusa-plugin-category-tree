@@ -93,25 +93,25 @@ export const CanvasDock: React.FC<CanvasDockProps> = ({
           <div className="flex items-center p-0.5 bg-ui-bg-subtle border border-ui-border-base rounded-lg gap-0.5">
             <button
               type="button"
-              onClick={() => (onSelectDirection ? onSelectDirection("TB") : onToggleDirection())}
-              className={`px-2 py-0.5 text-xs font-medium rounded-md transition-all ${
-                direction === "TB"
-                  ? "bg-ui-bg-base text-ui-fg-base shadow-xs font-semibold"
-                  : "text-ui-fg-muted hover:text-ui-fg-base"
-              }`}
-              title="Vertical Tree Layout (Default)"
-            >
-              ⬇ Vertical
-            </button>
-            <button
-              type="button"
               onClick={() => (onSelectDirection ? onSelectDirection("LR") : onToggleDirection())}
               className={`px-2 py-0.5 text-xs font-medium rounded-md transition-all ${
                 direction === "LR"
                   ? "bg-ui-bg-base text-ui-fg-base shadow-xs font-semibold"
                   : "text-ui-fg-muted hover:text-ui-fg-base"
               }`}
-              title="Mind Map Layout (Horizontal)"
+              title="Vertical Tree Layout"
+            >
+              ⬇ Vertical
+            </button>
+            <button
+              type="button"
+              onClick={() => (onSelectDirection ? onSelectDirection("TB") : onToggleDirection())}
+              className={`px-2 py-0.5 text-xs font-medium rounded-md transition-all ${
+                direction === "TB"
+                  ? "bg-ui-bg-base text-ui-fg-base shadow-xs font-semibold"
+                  : "text-ui-fg-muted hover:text-ui-fg-base"
+              }`}
+              title="Mind Map Layout"
             >
               ➡ Mind Map
             </button>

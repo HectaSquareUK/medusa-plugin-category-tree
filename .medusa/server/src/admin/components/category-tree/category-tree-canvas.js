@@ -27,7 +27,7 @@ const CanvasInner = () => {
     const [salesChannels, setSalesChannels] = (0, react_1.useState)([]);
     const [isLoading, setIsLoading] = (0, react_1.useState)(true);
     const [isSaving, setIsSaving] = (0, react_1.useState)(false);
-    const [direction, setDirection] = (0, react_1.useState)("TB");
+    const [direction, setDirection] = (0, react_1.useState)("LR");
     const [selectedStorefront, setSelectedStorefront] = (0, react_1.useState)("all");
     const [searchQuery, setSearchQuery] = (0, react_1.useState)("");
     const [collapsedIds, setCollapsedIds] = (0, react_1.useState)(new Set());
@@ -270,7 +270,48 @@ const CanvasInner = () => {
                         setCreateDrawerOpen(true);
                     }, dirtyCount: dirtyMoves.length, isSaving: isSaving, onSave: handleSave, onReset: handleReset }) }), (0, jsx_runtime_1.jsxs)(react_2.ReactFlow, { nodes: nodes, edges: edges, onNodesChange: onNodesChange, onEdgesChange: onEdgesChange, onConnect: onConnect, onEdgesDelete: onEdgesDelete, onSelectionChange: (0, react_1.useCallback)(({ nodes }) => {
                     setSelectedNodeIds(nodes.map((n) => n.id));
-                }, []), selectionMode: react_2.SelectionMode.Partial, selectionOnDrag: isBoxSelect, panOnDrag: isBoxSelect ? [1, 2] : true, elementsSelectable: true, nodeTypes: nodeTypes, edgeTypes: edgeTypes, minZoom: 0.2, maxZoom: 2.0, defaultEdgeOptions: { type: "smoothstep" }, fitView: true, proOptions: { hideAttribution: true }, className: "touch-none", children: [(0, jsx_runtime_1.jsx)(react_2.Background, { color: "#cbd5e1", gap: 20, size: 1.25 }), (0, jsx_runtime_1.jsx)(react_2.Controls, { showInteractive: false, className: "!bottom-4 !left-4 !bg-[#18181b] !border !border-neutral-700 !rounded-xl !shadow-2xl !overflow-hidden [&_.react-flow\\_\\_controls-button]:!bg-[#18181b] [&_.react-flow\\_\\_controls-button]:!border-b [&_.react-flow\\_\\_controls-button]:!border-neutral-800 [&_.react-flow\\_\\_controls-button:hover]:!bg-[#27272a] [&_.react-flow\\_\\_controls-button_svg]:!fill-white [&_.react-flow\\_\\_controls-button_svg]:!stroke-white [&_.react-flow\\_\\_controls-button_path]:!fill-white" }), (0, jsx_runtime_1.jsx)(react_2.MiniMap, { nodeColor: () => "var(--bg-interactive, #3b82f6)", maskColor: "rgba(0, 0, 0, 0.25)", className: "!bottom-4 !right-4 !bg-[#18181b]/95 !backdrop-blur-md !border !border-neutral-700 !rounded-xl !shadow-xl !overflow-hidden", zoomable: true, pannable: true })] }), (0, jsx_runtime_1.jsx)(create_category_drawer_1.CreateCategoryDrawer, { open: createDrawerOpen, onOpenChange: setCreateDrawerOpen, parentCategory: createParentCategory, salesChannels: salesChannels, onSuccess: (newCat) => {
+                }, []), selectionMode: react_2.SelectionMode.Partial, selectionOnDrag: isBoxSelect, panOnDrag: isBoxSelect ? [1, 2] : true, elementsSelectable: true, nodeTypes: nodeTypes, edgeTypes: edgeTypes, minZoom: 0.2, maxZoom: 2.0, defaultEdgeOptions: { type: "smoothstep" }, fitView: true, proOptions: { hideAttribution: true }, className: "touch-none", children: [(0, jsx_runtime_1.jsx)(react_2.Background, { color: "#cbd5e1", gap: 20, size: 1.25 }), (0, jsx_runtime_1.jsx)(react_2.Controls, { showInteractive: false, className: "!bottom-4 !left-4" }), (0, jsx_runtime_1.jsx)("style", { children: `
+          .react-flow__controls {
+            background: #ffffff !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 9999px !important;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2) !important;
+            padding: 3px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 2px !important;
+            overflow: hidden !important;
+          }
+          .react-flow__controls-button {
+            background: #ffffff !important;
+            border: none !important;
+            border-bottom: 1px solid #f1f5f9 !important;
+            border-radius: 9999px !important;
+            width: 28px !important;
+            height: 28px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+            transition: background 0.15s ease !important;
+          }
+          .react-flow__controls-button:last-child {
+            border-bottom: none !important;
+          }
+          .react-flow__controls-button:hover {
+            background: #f3f4f6 !important;
+          }
+          .react-flow__controls-button svg {
+            fill: #000000 !important;
+            stroke: #000000 !important;
+            color: #000000 !important;
+          }
+          .react-flow__controls-button svg path {
+            fill: #000000 !important;
+            stroke: #000000 !important;
+            color: #000000 !important;
+          }
+        ` }), (0, jsx_runtime_1.jsx)(react_2.MiniMap, { nodeColor: () => "var(--bg-interactive, #3b82f6)", maskColor: "rgba(0, 0, 0, 0.25)", className: "!bottom-4 !right-4 !bg-[#18181b]/95 !backdrop-blur-md !border !border-neutral-700 !rounded-xl !shadow-xl !overflow-hidden", zoomable: true, pannable: true })] }), (0, jsx_runtime_1.jsx)(create_category_drawer_1.CreateCategoryDrawer, { open: createDrawerOpen, onOpenChange: setCreateDrawerOpen, parentCategory: createParentCategory, salesChannels: salesChannels, onSuccess: (newCat) => {
                     setCategories((prev) => [...prev, newCat]);
                     setOriginalCategories((prev) => [...prev, newCat]);
                 } }), (0, jsx_runtime_1.jsx)(edit_category_drawer_1.EditCategoryDrawer, { open: editDrawerOpen, onOpenChange: setEditDrawerOpen, category: editingCategory, salesChannels: salesChannels, onSuccess: (updatedCat) => {
