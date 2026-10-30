@@ -14,7 +14,7 @@ import {
   SelectionMode,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { toast, TooltipProvider } from "@medusajs/ui"
+import { toast, Toaster, TooltipProvider } from "@medusajs/ui"
 
 import { CategoryNode } from "./category-node"
 import { CustomSmoothStepEdge } from "./custom-edge"
@@ -506,6 +506,7 @@ export const CategoryTreeCanvas: React.FC = () => {
     <TooltipProvider>
       <ReactFlowProvider>
         <CanvasInner />
+        <Toaster />
       </ReactFlowProvider>
     </TooltipProvider>
   )

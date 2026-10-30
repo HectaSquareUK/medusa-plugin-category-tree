@@ -47,12 +47,26 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
     const [isUploading, setIsUploading] = (0, react_1.useState)(false);
     const [categoryImages, setCategoryImages] = (0, react_1.useState)([]);
     const [manualImageUrl, setManualImageUrl] = (0, react_1.useState)("");
+    // Unsaved changes & inline notification state
+    const [isDirty, setIsDirty] = (0, react_1.useState)(false);
+    const [showDiscardConfirm, setShowDiscardConfirm] = (0, react_1.useState)(false);
+    const [saveNotification, setSaveNotification] = (0, react_1.useState)(null);
+    const saveTimerRef = (0, react_1.useRef)(null);
+    const triggerSaveNotification = (0, react_1.useCallback)((type, message) => {
+        if (saveTimerRef.current)
+            clearTimeout(saveTimerRef.current);
+        setSaveNotification({ type, message });
+        saveTimerRef.current = setTimeout(() => {
+            setSaveNotification(null);
+        }, 4000);
+    }, []);
     const prevCategoryIdRef = (0, react_1.useRef)(null);
-    const savedSnapshotRef = (0, react_1.useRef)(null);
     (0, react_1.useEffect)(() => {
         if (!open) {
             prevCategoryIdRef.current = null;
-            savedSnapshotRef.current = null;
+            setIsDirty(false);
+            setShowDiscardConfirm(false);
+            setSaveNotification(null);
         }
     }, [open]);
     (0, react_1.useEffect)(() => {
@@ -61,6 +75,9 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
             if (isNewCategory) {
                 prevCategoryIdRef.current = category.id;
                 setActiveTab("general");
+                setIsDirty(false);
+                setShowDiscardConfirm(false);
+                setSaveNotification(null);
                 const initName = category.name || "";
                 const initHandle = category.handle || "";
                 const initDescription = category.description || category.metadata?.description || "";
@@ -94,17 +111,6 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
                     urls.push(meta.video_url.trim());
                 }
                 setYoutubeUrls(urls);
-                savedSnapshotRef.current = {
-                    name: initName.trim(),
-                    handle: initHandle.trim(),
-                    description: initDescription.trim(),
-                    rank: initRank,
-                    isActive: initActive,
-                    isInternal: initInternal,
-                    selectedChannels: [...initChannels],
-                    youtubeUrls: [...urls],
-                    categoryImages: [],
-                };
                 // Load category media from backend
                 loadCategoryImages(category.id, category.image_url || meta?.thumbnail || meta?.image, meta || undefined);
             }
@@ -128,9 +134,6 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
                     type: img.type === "thumbnail" ? "thumbnail" : img.url === bannerUrl ? "banner" : "image",
                 }));
                 setCategoryImages(mapped);
-                if (savedSnapshotRef.current) {
-                    savedSnapshotRef.current.categoryImages = mapped;
-                }
                 const thumb = mapped.find((img) => img.type === "thumbnail") || mapped[0];
                 if (thumb?.url)
                     setImageUrl(thumb.url);
@@ -144,16 +147,10 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
         if (metadata && Array.isArray(metadata.images)) {
             if (metadata.images.length === 0) {
                 setCategoryImages([]);
-                if (savedSnapshotRef.current) {
-                    savedSnapshotRef.current.categoryImages = [];
-                }
                 setImageUrl("");
                 return;
             }
             setCategoryImages(metadata.images);
-            if (savedSnapshotRef.current) {
-                savedSnapshotRef.current.categoryImages = metadata.images;
-            }
             const thumb = metadata.images.find((img) => img.type === "thumbnail") || metadata.images[0];
             if (thumb?.url)
                 setImageUrl(thumb.url);
@@ -170,9 +167,6 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
             list.push({ url: banner, type: "banner" });
         }
         setCategoryImages(list);
-        if (savedSnapshotRef.current) {
-            savedSnapshotRef.current.categoryImages = list;
-        }
     }, []);
     // Universal S3/Storage Media Upload Handler (works with AWS S3, MinIO, Cloudflare R2, Local)
     const handleFileUpload = async (files) => {
@@ -217,9 +211,11 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
                 ]);
             }
             ui_1.toast.success(`${uploadedFiles.length} image(s) uploaded successfully`);
+            triggerSaveNotification("success", `${uploadedFiles.length} image(s) uploaded!`);
         }
         catch (err) {
             ui_1.toast.error(err?.message || "Failed to upload image");
+            triggerSaveNotification("error", err?.message || "Failed to upload image");
         }
         finally {
             setIsUploading(false);
@@ -230,6 +226,8 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
     // Set selected image as Category Thumbnail
     const handleSetThumbnail = async (img) => {
         setImageUrl(img.url);
+        setIsDirty(true);
+        setShowDiscardConfirm(false);
         if (img.id) {
             try {
                 const currentThumb = categoryImages.find((i) => i.type === "thumbnail");
@@ -259,9 +257,12 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
             })));
         }
         ui_1.toast.success("Designated as category thumbnail (Nav & Cards)");
+        triggerSaveNotification("success", "Designated as category thumbnail (click Save Category)");
     };
     // Set selected image as Hero Banner
     const handleSetBanner = (img) => {
+        setIsDirty(true);
+        setShowDiscardConfirm(false);
         setCategoryImages((prev) => prev.map((item) => {
             if (item.url === img.url)
                 return { ...item, type: "banner" };
@@ -270,6 +271,7 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
             return item;
         }));
         ui_1.toast.success("Designated as category hero banner");
+        triggerSaveNotification("success", "Designated as hero banner (click Save Category)");
     };
     // Add external URL image to gallery
     const handleAddManualImage = () => {
@@ -287,7 +289,11 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
         if (isFirst)
             setImageUrl(raw);
         setManualImageUrl("");
-        ui_1.toast.success(`Added to gallery as ${newType === "thumbnail" ? "Thumbnail" : newType === "banner" ? "Hero Banner" : "Image"}`);
+        setIsDirty(true);
+        setShowDiscardConfirm(false);
+        const msg = `Added to gallery as ${newType === "thumbnail" ? "Thumbnail" : newType === "banner" ? "Hero Banner" : "Image"} (click Save Category to persist)`;
+        ui_1.toast.success(msg);
+        triggerSaveNotification("success", msg);
     };
     // Delete category image with immediate persistence & explicit nulls
     const handleDeleteImage = async (img) => {
@@ -299,9 +305,6 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
         // Update local state immediately
         setCategoryImages(remaining);
         setImageUrl(nextThumb ? nextThumb.url : "");
-        if (savedSnapshotRef.current) {
-            savedSnapshotRef.current.categoryImages = remaining;
-        }
         const updatedMeta = {
             ...(currentMetadata || {}),
             images: remaining,
@@ -338,15 +341,19 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
             };
             onSuccess(updatedCat);
             ui_1.toast.success("Image removed and changes saved");
+            triggerSaveNotification("success", "Image removed and changes saved");
         }
         catch (err) {
             console.warn("Could not immediately update category metadata on delete:", err);
             ui_1.toast.info("Image removed from gallery (remember to save)");
+            triggerSaveNotification("error", "Image removed locally (click Save Category)");
         }
     };
     if (!category)
         return null;
     const toggleChannel = (channelId) => {
+        setIsDirty(true);
+        setShowDiscardConfirm(false);
         setSelectedChannels((prev) => prev.includes(channelId)
             ? prev.filter((id) => id !== channelId)
             : [...prev, channelId]);
@@ -358,11 +365,13 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
         const id = extractYouTubeVideoId(raw);
         if (!id) {
             ui_1.toast.error("Please enter a valid YouTube URL or video ID");
+            triggerSaveNotification("error", "Please enter a valid YouTube URL or video ID");
             return;
         }
         const cleanUrl = `https://www.youtube.com/watch?v=${id}`;
         if (youtubeUrls.includes(cleanUrl)) {
             ui_1.toast.error("Video already added");
+            triggerSaveNotification("error", "Video already added");
             return;
         }
         const nextUrls = [...youtubeUrls, cleanUrl];
@@ -384,13 +393,12 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
                 ...category,
                 metadata: updatedMeta,
             });
-            if (savedSnapshotRef.current) {
-                savedSnapshotRef.current.youtubeUrls = nextUrls;
-            }
             ui_1.toast.success("YouTube video added and saved");
+            triggerSaveNotification("success", "YouTube video added and saved!");
         }
         catch {
             ui_1.toast.success("YouTube video added");
+            triggerSaveNotification("success", "YouTube video added!");
         }
     };
     const handleRemoveYoutube = async (urlToRemove) => {
@@ -412,13 +420,12 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
                 ...category,
                 metadata: updatedMeta,
             });
-            if (savedSnapshotRef.current) {
-                savedSnapshotRef.current.youtubeUrls = nextUrls;
-            }
             ui_1.toast.success("Video removed and changes saved");
+            triggerSaveNotification("success", "Video removed and changes saved!");
         }
         catch {
             ui_1.toast.info("Video removed (remember to save)");
+            triggerSaveNotification("error", "Video removed locally (click Save Category)");
         }
     };
     const handleSubmit = async (eOrClose, closeAfter = false) => {
@@ -431,6 +438,7 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
         }
         if (!name.trim()) {
             ui_1.toast.error("Category name is required");
+            triggerSaveNotification("error", "Category name is required");
             return;
         }
         setIsSubmitting(true);
@@ -456,10 +464,12 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
                 banner: bannerImg ? bannerImg.url : null,
                 image: (bannerImg?.url || thumbImg?.url) || null,
             };
+            // IMPORTANT: Medusa v2 UpdateProductCategory Zod schema defines description: z.string().optional() (NOT nullable).
+            // Sending empty string "" instead of null prevents 400 Bad Request errors when description is blank.
             await sdk_1.sdk.admin.productCategory.update(category.id, {
                 name: name.trim(),
                 handle: handle.trim() || undefined,
-                description: descValue ? descValue : null,
+                description: descValue,
                 rank: Number(rank) || 0,
                 is_active: isActive,
                 is_internal: isInternal,
@@ -477,25 +487,19 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
                 is_internal: isInternal,
                 metadata: updatedMetadata,
             };
-            ui_1.toast.success("Category updated successfully");
-            savedSnapshotRef.current = {
-                name: name.trim(),
-                handle: handle.trim(),
-                description: descValue,
-                rank: Number(rank) || 0,
-                isActive,
-                isInternal,
-                selectedChannels: [...selectedChannels],
-                youtubeUrls: [...youtubeUrls],
-                categoryImages: [...categoryImages],
-            };
+            setIsDirty(false);
+            setShowDiscardConfirm(false);
+            ui_1.toast.success("Category changes saved successfully");
+            triggerSaveNotification("success", "Changes saved successfully!");
             onSuccess(updated);
             if (shouldClose) {
                 onOpenChange(false);
             }
         }
         catch (err) {
-            ui_1.toast.error(err?.message || "Failed to update category");
+            const errMsg = err?.message || "Failed to update category";
+            ui_1.toast.error(errMsg);
+            triggerSaveNotification("error", errMsg);
         }
         finally {
             setIsSubmitting(false);
@@ -514,52 +518,21 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
         }
         catch (err) {
             ui_1.toast.error(err?.message || "Failed to delete category");
+            triggerSaveNotification("error", err?.message || "Failed to delete category");
         }
         finally {
             setIsDeleting(false);
         }
     };
-    const hasUnsavedChanges = (0, react_1.useCallback)(() => {
-        if (!savedSnapshotRef.current)
-            return false;
-        const s = savedSnapshotRef.current;
-        if (name.trim() !== s.name)
-            return true;
-        if (handle.trim() !== s.handle)
-            return true;
-        if (description.trim() !== s.description)
-            return true;
-        if ((Number(rank) || 0) !== s.rank)
-            return true;
-        if (isActive !== s.isActive)
-            return true;
-        if (isInternal !== s.isInternal)
-            return true;
-        if (s.selectedChannels.length !== selectedChannels.length)
-            return true;
-        const sortedCurrent = [...selectedChannels].sort();
-        const sortedSaved = [...s.selectedChannels].sort();
-        if (sortedCurrent.some((c, idx) => c !== sortedSaved[idx]))
-            return true;
-        if (s.youtubeUrls.length !== youtubeUrls.length)
-            return true;
-        if (youtubeUrls.some((u, idx) => u !== s.youtubeUrls[idx]))
-            return true;
-        if (s.categoryImages.length !== categoryImages.length)
-            return true;
-        if (categoryImages.some((img, idx) => img.url !== s.categoryImages[idx]?.url || img.type !== s.categoryImages[idx]?.type)) {
-            return true;
-        }
-        return false;
-    }, [name, handle, description, rank, isActive, isInternal, selectedChannels, youtubeUrls, categoryImages]);
     const handleClose = (0, react_1.useCallback)(() => {
-        if (hasUnsavedChanges()) {
-            const confirmDiscard = window.confirm("You have unsaved changes. Discard changes and close?");
-            if (!confirmDiscard)
-                return;
+        if (isDirty && !showDiscardConfirm) {
+            setShowDiscardConfirm(true);
+            return;
         }
+        setIsDirty(false);
+        setShowDiscardConfirm(false);
         onOpenChange(false);
-    }, [hasUnsavedChanges, onOpenChange]);
+    }, [isDirty, showDiscardConfirm, onOpenChange]);
     const handleDrawerOpenChange = (0, react_1.useCallback)((newOpen) => {
         if (!newOpen) {
             handleClose();
@@ -578,7 +551,43 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
                                             ? "border-blue-600 text-blue-600 font-semibold"
                                             : "border-transparent text-ui-fg-muted hover:text-ui-fg-base"}`, children: "Storefronts & Media" }), (0, jsx_runtime_1.jsxs)("button", { type: "button", onClick: () => setActiveTab("youtube"), className: `flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 transition-colors cursor-pointer ${activeTab === "youtube"
                                             ? "border-blue-600 text-blue-600 font-semibold"
-                                            : "border-transparent text-ui-fg-muted hover:text-ui-fg-base"}`, children: [(0, jsx_runtime_1.jsx)("span", { children: "YouTube Videos" }), youtubeUrls.length > 0 && ((0, jsx_runtime_1.jsx)("span", { className: "px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200", children: youtubeUrls.length }))] })] })] }), (0, jsx_runtime_1.jsxs)(ui_1.Drawer.Body, { className: "overflow-y-auto flex-1 p-6", children: [activeTab === "general" && ((0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col gap-4", children: [(0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col gap-1.5", children: [(0, jsx_runtime_1.jsx)(ui_1.Label, { htmlFor: "edit-name", className: "text-xs font-semibold", children: "Category Name *" }), (0, jsx_runtime_1.jsx)(ui_1.Input, { id: "edit-name", value: name, onChange: (e) => setName(e.target.value), required: true })] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col gap-1.5", children: [(0, jsx_runtime_1.jsx)(ui_1.Label, { htmlFor: "edit-handle", className: "text-xs font-semibold", children: "Handle (URL Slug)" }), (0, jsx_runtime_1.jsx)(ui_1.Input, { id: "edit-handle", value: handle, onChange: (e) => setHandle(e.target.value), placeholder: "e.g. rayon-embroidery-thread" })] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col gap-1.5 p-3 rounded-xl border border-ui-border-base bg-ui-bg-subtle/50", children: [(0, jsx_runtime_1.jsxs)("div", { className: "flex items-center justify-between", children: [(0, jsx_runtime_1.jsx)(ui_1.Label, { htmlFor: "edit-rank", className: "text-xs font-semibold", children: "Storefront Ranking (Sort Order)" }), (0, jsx_runtime_1.jsx)("span", { className: "text-[10px] font-mono text-ui-fg-muted", children: "Controls Storefront 2 & Monfil" })] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-2", children: [(0, jsx_runtime_1.jsx)(ui_1.Input, { id: "edit-rank", type: "number", size: "small", value: rank, onChange: (e) => setRank(Number(e.target.value)), className: "w-24" }), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-1", children: [(0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => setRank((r) => Math.max(0, r - 1)), className: "px-2 py-1 text-xs font-medium rounded border border-ui-border-base bg-ui-bg-base hover:bg-ui-bg-subtle transition-colors cursor-pointer", title: "Move Earlier in Storefront", children: "\u2191 Earlier" }), (0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => setRank((r) => r + 1), className: "px-2 py-1 text-xs font-medium rounded border border-ui-border-base bg-ui-bg-base hover:bg-ui-bg-subtle transition-colors cursor-pointer", title: "Move Later in Storefront", children: "\u2193 Later" }), (0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => setRank(0), className: "px-2 py-1 text-xs font-medium rounded border border-ui-border-base bg-ui-bg-base hover:bg-ui-bg-subtle transition-colors cursor-pointer", title: "Set as First Category", children: "Top (#0)" })] })] }), (0, jsx_runtime_1.jsx)("p", { className: "text-[11px] text-ui-fg-muted leading-relaxed", children: "Categories are sorted by rank ASC (0, 1, 2...). Lower numbers appear first on your storefront navigation menu." })] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col gap-1.5", children: [(0, jsx_runtime_1.jsx)(ui_1.Label, { htmlFor: "edit-desc", className: "text-xs font-semibold", children: "Description" }), (0, jsx_runtime_1.jsx)(ui_1.Textarea, { id: "edit-desc", value: description, onChange: (e) => setDescription(e.target.value), rows: 3 })] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center justify-between pt-2 border-t border-ui-border-base", children: [(0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)(ui_1.Label, { className: "text-xs font-semibold", children: "Active Status" }), (0, jsx_runtime_1.jsx)(ui_1.Text, { size: "xsmall", className: "text-ui-fg-muted", children: "Visible to shoppers on enabled storefronts" })] }), (0, jsx_runtime_1.jsx)(ui_1.Switch, { checked: isActive, onCheckedChange: setIsActive })] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center justify-between", children: [(0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)(ui_1.Label, { className: "text-xs font-semibold", children: "Internal Only" }), (0, jsx_runtime_1.jsx)(ui_1.Text, { size: "xsmall", className: "text-ui-fg-muted", children: "Hidden from public storefront navigation" })] }), (0, jsx_runtime_1.jsx)(ui_1.Switch, { checked: isInternal, onCheckedChange: setIsInternal })] }), (0, jsx_runtime_1.jsx)("div", { className: "pt-3 border-t border-ui-border-base", children: (0, jsx_runtime_1.jsxs)(ui_1.Button, { type: "button", variant: "danger", size: "small", onClick: handleDelete, isLoading: isDeleting, className: "w-full flex items-center justify-center gap-1.5", children: [(0, jsx_runtime_1.jsx)(icons_1.Trash, { className: "w-3.5 h-3.5" }), (0, jsx_runtime_1.jsx)("span", { children: "Delete Category" })] }) })] })), activeTab === "products" && ((0, jsx_runtime_1.jsx)("div", { className: "flex flex-col gap-3", children: (0, jsx_runtime_1.jsx)(category_products_manager_1.CategoryProductsManager, { categoryId: category.id, categoryName: category.name, initialMetadata: currentMetadata, onMetadataUpdate: (meta) => {
+                                            : "border-transparent text-ui-fg-muted hover:text-ui-fg-base"}`, children: [(0, jsx_runtime_1.jsx)("span", { children: "YouTube Videos" }), youtubeUrls.length > 0 && ((0, jsx_runtime_1.jsx)("span", { className: "px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200", children: youtubeUrls.length }))] })] })] }), (0, jsx_runtime_1.jsxs)(ui_1.Drawer.Body, { className: "overflow-y-auto flex-1 p-6", children: [activeTab === "general" && ((0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col gap-4", children: [(0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col gap-1.5", children: [(0, jsx_runtime_1.jsx)(ui_1.Label, { htmlFor: "edit-name", className: "text-xs font-semibold", children: "Category Name *" }), (0, jsx_runtime_1.jsx)(ui_1.Input, { id: "edit-name", value: name, onChange: (e) => {
+                                                    setName(e.target.value);
+                                                    setIsDirty(true);
+                                                    setShowDiscardConfirm(false);
+                                                }, required: true })] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col gap-1.5", children: [(0, jsx_runtime_1.jsx)(ui_1.Label, { htmlFor: "edit-handle", className: "text-xs font-semibold", children: "Handle (URL Slug)" }), (0, jsx_runtime_1.jsx)(ui_1.Input, { id: "edit-handle", value: handle, onChange: (e) => {
+                                                    setHandle(e.target.value);
+                                                    setIsDirty(true);
+                                                    setShowDiscardConfirm(false);
+                                                }, placeholder: "e.g. rayon-embroidery-thread" })] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col gap-1.5 p-3 rounded-xl border border-ui-border-base bg-ui-bg-subtle/50", children: [(0, jsx_runtime_1.jsxs)("div", { className: "flex items-center justify-between", children: [(0, jsx_runtime_1.jsx)(ui_1.Label, { htmlFor: "edit-rank", className: "text-xs font-semibold", children: "Storefront Ranking (Sort Order)" }), (0, jsx_runtime_1.jsx)("span", { className: "text-[10px] font-mono text-ui-fg-muted", children: "Controls Storefront 2 & Monfil" })] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-2", children: [(0, jsx_runtime_1.jsx)(ui_1.Input, { id: "edit-rank", type: "number", size: "small", value: rank, onChange: (e) => {
+                                                            setRank(Number(e.target.value));
+                                                            setIsDirty(true);
+                                                            setShowDiscardConfirm(false);
+                                                        }, className: "w-24" }), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-1", children: [(0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => {
+                                                                    setRank((r) => Math.max(0, r - 1));
+                                                                    setIsDirty(true);
+                                                                    setShowDiscardConfirm(false);
+                                                                }, className: "px-2 py-1 text-xs font-medium rounded border border-ui-border-base bg-ui-bg-base hover:bg-ui-bg-subtle transition-colors cursor-pointer", title: "Move Earlier in Storefront", children: "\u2191 Earlier" }), (0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => {
+                                                                    setRank((r) => r + 1);
+                                                                    setIsDirty(true);
+                                                                    setShowDiscardConfirm(false);
+                                                                }, className: "px-2 py-1 text-xs font-medium rounded border border-ui-border-base bg-ui-bg-base hover:bg-ui-bg-subtle transition-colors cursor-pointer", title: "Move Later in Storefront", children: "\u2193 Later" }), (0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => {
+                                                                    setRank(0);
+                                                                    setIsDirty(true);
+                                                                    setShowDiscardConfirm(false);
+                                                                }, className: "px-2 py-1 text-xs font-medium rounded border border-ui-border-base bg-ui-bg-base hover:bg-ui-bg-subtle transition-colors cursor-pointer", title: "Set as First Category", children: "Top (#0)" })] })] }), (0, jsx_runtime_1.jsx)("p", { className: "text-[11px] text-ui-fg-muted leading-relaxed", children: "Categories are sorted by rank ASC (0, 1, 2...). Lower numbers appear first on your storefront navigation menu." })] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col gap-1.5", children: [(0, jsx_runtime_1.jsx)(ui_1.Label, { htmlFor: "edit-desc", className: "text-xs font-semibold", children: "Description" }), (0, jsx_runtime_1.jsx)(ui_1.Textarea, { id: "edit-desc", value: description, onChange: (e) => {
+                                                    setDescription(e.target.value);
+                                                    setIsDirty(true);
+                                                    setShowDiscardConfirm(false);
+                                                }, rows: 3 })] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center justify-between pt-2 border-t border-ui-border-base", children: [(0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)(ui_1.Label, { className: "text-xs font-semibold", children: "Active Status" }), (0, jsx_runtime_1.jsx)(ui_1.Text, { size: "xsmall", className: "text-ui-fg-muted", children: "Visible to shoppers on enabled storefronts" })] }), (0, jsx_runtime_1.jsx)(ui_1.Switch, { checked: isActive, onCheckedChange: (val) => {
+                                                    setIsActive(val);
+                                                    setIsDirty(true);
+                                                    setShowDiscardConfirm(false);
+                                                } })] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center justify-between", children: [(0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)(ui_1.Label, { className: "text-xs font-semibold", children: "Internal Only" }), (0, jsx_runtime_1.jsx)(ui_1.Text, { size: "xsmall", className: "text-ui-fg-muted", children: "Hidden from public storefront navigation" })] }), (0, jsx_runtime_1.jsx)(ui_1.Switch, { checked: isInternal, onCheckedChange: (val) => {
+                                                    setIsInternal(val);
+                                                    setIsDirty(true);
+                                                    setShowDiscardConfirm(false);
+                                                } })] }), (0, jsx_runtime_1.jsx)("div", { className: "pt-3 border-t border-ui-border-base", children: (0, jsx_runtime_1.jsxs)(ui_1.Button, { type: "button", variant: "danger", size: "small", onClick: handleDelete, isLoading: isDeleting, className: "w-full flex items-center justify-center gap-1.5", children: [(0, jsx_runtime_1.jsx)(icons_1.Trash, { className: "w-3.5 h-3.5" }), (0, jsx_runtime_1.jsx)("span", { children: "Delete Category" })] }) })] })), activeTab === "products" && ((0, jsx_runtime_1.jsx)("div", { className: "flex flex-col gap-3", children: (0, jsx_runtime_1.jsx)(category_products_manager_1.CategoryProductsManager, { categoryId: category.id, categoryName: category.name, initialMetadata: currentMetadata, onMetadataUpdate: (meta) => {
                                         setCurrentMetadata(meta);
                                     } }) })), activeTab === "channels" && ((0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col gap-4", children: [(0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col gap-2", children: [(0, jsx_runtime_1.jsx)(ui_1.Label, { className: "text-xs font-semibold", children: "Storefront Visibility" }), (0, jsx_runtime_1.jsx)(ui_1.Text, { size: "xsmall", className: "text-ui-fg-muted", children: "Designate which storefront sales channels display this category." }), (0, jsx_runtime_1.jsx)("div", { className: "flex flex-col gap-2 mt-1", children: salesChannels.map((channel) => {
                                                     const isChecked = selectedChannels.includes(channel.id);
@@ -614,20 +623,26 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
                                                                                     e.stopPropagation();
                                                                                     handleDeleteImage(img);
                                                                                 }, className: "w-full py-0.5 bg-rose-600 text-white rounded text-[9px] font-semibold hover:bg-rose-700 transition-colors shadow-xs text-center cursor-pointer", children: "Delete" })] })] }, img.id || img.url || idx));
-                                                        }) })] })), (0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col gap-1.5 mt-2 p-3 rounded-xl border border-ui-border-base bg-ui-bg-subtle/30", children: [(0, jsx_runtime_1.jsx)(ui_1.Label, { className: "text-xs font-semibold text-ui-fg-base", children: "External Image URL (CDN / Manual)" }), (0, jsx_runtime_1.jsx)("p", { className: "text-[11px] text-ui-fg-muted", children: "Or paste a direct image URL (S3, Cloudinary, Imgur, Supabase) to link without uploading." }), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-2 mt-1", children: [(0, jsx_runtime_1.jsx)(ui_1.Input, { size: "small", type: "url", placeholder: "https://example.com/category-image.jpg", value: manualImageUrl, onChange: (e) => setManualImageUrl(e.target.value), className: "text-xs flex-1", onKeyDown: (e) => {
-                                                                    if (e.key === "Enter") {
-                                                                        e.preventDefault();
-                                                                        handleAddManualImage();
-                                                                    }
-                                                                } }), (0, jsx_runtime_1.jsxs)(ui_1.Button, { type: "button", size: "small", variant: "secondary", onClick: handleAddManualImage, disabled: !manualImageUrl.trim(), className: "text-xs shrink-0", children: [(0, jsx_runtime_1.jsx)(icons_1.Plus, { className: "w-3.5 h-3.5 mr-1" }), "Add to Gallery"] })] })] })] })] })), activeTab === "youtube" && ((0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col gap-4", children: [(0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)("h4", { className: "text-xs font-semibold text-ui-fg-base", children: "Category Demonstration Videos (YouTube)" }), (0, jsx_runtime_1.jsx)("p", { className: "text-xs text-ui-fg-muted mt-0.5", children: "Attach YouTube video demonstration links to show interactive video carousels on the storefront category page." })] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-2", children: [(0, jsx_runtime_1.jsx)(ui_1.Input, { size: "small", placeholder: "Paste YouTube watch URL, shorts, or video ID\u2026", value: newYoutubeInput, onChange: (e) => setNewYoutubeInput(e.target.value), className: "flex-1 text-xs", onKeyDown: (e) => {
-                                                    if (e.key === "Enter") {
-                                                        e.preventDefault();
-                                                        handleAddYoutube();
-                                                    }
-                                                } }), (0, jsx_runtime_1.jsxs)(ui_1.Button, { size: "small", type: "button", variant: "secondary", onClick: handleAddYoutube, className: "flex items-center gap-1 text-xs flex-shrink-0", children: [(0, jsx_runtime_1.jsx)(icons_1.Plus, { className: "w-3.5 h-3.5" }), (0, jsx_runtime_1.jsx)("span", { children: "Add Video" })] })] }), youtubeUrls.length === 0 ? ((0, jsx_runtime_1.jsx)("div", { className: "p-8 text-center text-xs text-ui-fg-muted border border-dashed border-ui-border-base rounded-xl", children: "No demonstration videos attached yet." })) : ((0, jsx_runtime_1.jsx)("div", { className: "grid grid-cols-2 gap-3", children: youtubeUrls.map((url) => {
+                                                        }) })] })), (0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col gap-1.5 mt-2 p-3 rounded-xl border border-ui-border-base bg-ui-bg-subtle/30", children: [(0, jsx_runtime_1.jsx)(ui_1.Label, { className: "text-xs font-semibold text-ui-fg-base", children: "External Image URL (CDN / Manual)" }), (0, jsx_runtime_1.jsx)("p", { className: "text-[11px] text-ui-fg-muted", children: "Or paste a direct image URL (S3, Cloudinary, Imgur, Supabase) to link without uploading." }), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-2 mt-1 w-full", children: [(0, jsx_runtime_1.jsx)("div", { className: "flex-1 min-w-[360px] sm:min-w-[500px]", children: (0, jsx_runtime_1.jsx)(ui_1.Input, { size: "small", type: "url", placeholder: "https://example.com/category-image.jpg", value: manualImageUrl, onChange: (e) => setManualImageUrl(e.target.value), className: "text-xs w-full", onKeyDown: (e) => {
+                                                                        if (e.key === "Enter") {
+                                                                            e.preventDefault();
+                                                                            handleAddManualImage();
+                                                                        }
+                                                                    } }) }), (0, jsx_runtime_1.jsxs)(ui_1.Button, { type: "button", size: "small", variant: "secondary", onClick: handleAddManualImage, disabled: !manualImageUrl.trim(), className: "text-xs shrink-0", children: [(0, jsx_runtime_1.jsx)(icons_1.Plus, { className: "w-3.5 h-3.5 mr-1" }), "Add to Gallery"] })] })] })] })] })), activeTab === "youtube" && ((0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col gap-4", children: [(0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)("h4", { className: "text-xs font-semibold text-ui-fg-base", children: "Category Demonstration Videos (YouTube)" }), (0, jsx_runtime_1.jsx)("p", { className: "text-xs text-ui-fg-muted mt-0.5", children: "Attach YouTube video demonstration links to show interactive video carousels on the storefront category page." })] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-2 w-full", children: [(0, jsx_runtime_1.jsx)("div", { className: "flex-1 min-w-[360px] sm:min-w-[500px]", children: (0, jsx_runtime_1.jsx)(ui_1.Input, { size: "small", placeholder: "Paste YouTube watch URL, shorts, or video ID\u2026", value: newYoutubeInput, onChange: (e) => setNewYoutubeInput(e.target.value), className: "w-full text-xs", onKeyDown: (e) => {
+                                                        if (e.key === "Enter") {
+                                                            e.preventDefault();
+                                                            handleAddYoutube();
+                                                        }
+                                                    } }) }), (0, jsx_runtime_1.jsxs)(ui_1.Button, { size: "small", type: "button", variant: "secondary", onClick: handleAddYoutube, className: "flex items-center gap-1 text-xs flex-shrink-0", children: [(0, jsx_runtime_1.jsx)(icons_1.Plus, { className: "w-3.5 h-3.5" }), (0, jsx_runtime_1.jsx)("span", { children: "Add Video" })] })] }), youtubeUrls.length === 0 ? ((0, jsx_runtime_1.jsx)("div", { className: "p-8 text-center text-xs text-ui-fg-muted border border-dashed border-ui-border-base rounded-xl", children: "No demonstration videos attached yet." })) : ((0, jsx_runtime_1.jsx)("div", { className: "grid grid-cols-2 gap-3", children: youtubeUrls.map((url) => {
                                             const id = extractYouTubeVideoId(url);
                                             const thumb = id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;
                                             return ((0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col border border-ui-border-base rounded-xl overflow-hidden bg-ui-bg-subtle/40 shadow-xs", children: [(0, jsx_runtime_1.jsxs)("div", { className: "relative aspect-video bg-black/80 overflow-hidden flex items-center justify-center", children: [thumb ? ((0, jsx_runtime_1.jsx)("img", { src: thumb, alt: "YouTube Preview", className: "w-full h-full object-cover" })) : ((0, jsx_runtime_1.jsx)("span", { className: "text-xs text-white", children: "Video" })), (0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => handleRemoveYoutube(url), className: "absolute top-1.5 right-1.5 p-1 bg-black/70 hover:bg-rose-600 text-white rounded-full transition-colors cursor-pointer", title: "Remove video", children: (0, jsx_runtime_1.jsx)(icons_1.Trash, { className: "w-3 h-3" }) })] }), (0, jsx_runtime_1.jsx)("div", { className: "p-2", children: (0, jsx_runtime_1.jsx)("span", { className: "text-[10px] text-ui-fg-muted truncate block font-mono", title: url, children: url }) })] }, url));
-                                        }) }))] }))] }), (0, jsx_runtime_1.jsxs)(ui_1.Drawer.Footer, { className: "flex justify-end gap-2 px-6 py-4 border-t border-ui-border-base", children: [(0, jsx_runtime_1.jsx)(ui_1.Button, { type: "button", variant: "secondary", size: "small", onClick: handleClose, disabled: isSubmitting || isDeleting, children: "Close" }), (0, jsx_runtime_1.jsx)(ui_1.Button, { type: "button", size: "small", onClick: () => handleSubmit(false), isLoading: isSubmitting, disabled: isSubmitting || !name.trim() || isDeleting, children: "Save Category" })] })] }) }) }));
+                                        }) }))] }))] }), (0, jsx_runtime_1.jsxs)(ui_1.Drawer.Footer, { className: "flex flex-col gap-2 px-6 py-4 border-t border-ui-border-base", children: [showDiscardConfirm && ((0, jsx_runtime_1.jsxs)("div", { className: "flex items-center justify-between gap-3 w-full px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs", children: [(0, jsx_runtime_1.jsx)("span", { className: "font-medium", children: "You have unsaved changes. Discard changes and close?" }), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-2 shrink-0", children: [(0, jsx_runtime_1.jsx)(ui_1.Button, { type: "button", size: "small", variant: "secondary", onClick: () => setShowDiscardConfirm(false), children: "Keep Editing" }), (0, jsx_runtime_1.jsx)(ui_1.Button, { type: "button", size: "small", variant: "danger", onClick: () => {
+                                                    setIsDirty(false);
+                                                    setShowDiscardConfirm(false);
+                                                    onOpenChange(false);
+                                                }, children: "Discard & Close" })] })] })), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center justify-between w-full gap-2", children: [(0, jsx_runtime_1.jsx)("div", { className: "flex items-center", children: saveNotification && ((0, jsx_runtime_1.jsxs)("span", { className: `inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold shadow-2xs ${saveNotification.type === "success"
+                                                ? "bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-800"
+                                                : "bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-950 dark:text-rose-200 dark:border-rose-800"}`, children: [saveNotification.type === "success" ? "✓ " : "⚠ ", saveNotification.message] })) }), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-2 ml-auto", children: [(0, jsx_runtime_1.jsx)(ui_1.Button, { type: "button", variant: "secondary", size: "small", onClick: handleClose, disabled: isSubmitting || isDeleting, children: "Close" }), (0, jsx_runtime_1.jsx)(ui_1.Button, { type: "button", size: "small", onClick: () => handleSubmit(false), isLoading: isSubmitting, disabled: isSubmitting || !name.trim() || isDeleting, children: saveNotification?.type === "success" ? "✓ Saved!" : "Save Category" })] })] })] })] }) }) }));
 };
 exports.EditCategoryDrawer = EditCategoryDrawer;

@@ -330,6 +330,6 @@ const CanvasInner = () => {
                 } })] }));
 };
 const CategoryTreeCanvas = () => {
-    return ((0, jsx_runtime_1.jsx)(ui_1.TooltipProvider, { children: (0, jsx_runtime_1.jsx)(react_2.ReactFlowProvider, { children: (0, jsx_runtime_1.jsx)(CanvasInner, {}) }) }));
+    return ((0, jsx_runtime_1.jsx)(ui_1.TooltipProvider, { children: (0, jsx_runtime_1.jsxs)(react_2.ReactFlowProvider, { children: [(0, jsx_runtime_1.jsx)(CanvasInner, {}), (0, jsx_runtime_1.jsx)(ui_1.Toaster, {})] }) }));
 };
 exports.CategoryTreeCanvas = CategoryTreeCanvas;

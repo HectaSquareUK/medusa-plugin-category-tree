@@ -72,25 +72,31 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
   const [categoryImages, setCategoryImages] = useState<Array<{ id?: string; url: string; type?: string; file_id?: string }>>([])
   const [manualImageUrl, setManualImageUrl] = useState("")
 
-  interface FormSnapshot {
-    name: string
-    handle: string
-    description: string
-    rank: number
-    isActive: boolean
-    isInternal: boolean
-    selectedChannels: string[]
-    youtubeUrls: string[]
-    categoryImages: Array<{ id?: string; url: string; type?: string; file_id?: string }>
-  }
+  // Unsaved changes & inline notification state
+  const [isDirty, setIsDirty] = useState(false)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
+  const [saveNotification, setSaveNotification] = useState<{
+    type: "success" | "error"
+    message: string
+  } | null>(null)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const triggerSaveNotification = useCallback((type: "success" | "error", message: string) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    setSaveNotification({ type, message })
+    saveTimerRef.current = setTimeout(() => {
+      setSaveNotification(null)
+    }, 4000)
+  }, [])
 
   const prevCategoryIdRef = useRef<string | null>(null)
-  const savedSnapshotRef = useRef<FormSnapshot | null>(null)
 
   useEffect(() => {
     if (!open) {
       prevCategoryIdRef.current = null
-      savedSnapshotRef.current = null
+      setIsDirty(false)
+      setShowDiscardConfirm(false)
+      setSaveNotification(null)
     }
   }, [open])
 
@@ -100,6 +106,9 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
       if (isNewCategory) {
         prevCategoryIdRef.current = category.id
         setActiveTab("general")
+        setIsDirty(false)
+        setShowDiscardConfirm(false)
+        setSaveNotification(null)
 
         const initName = category.name || ""
         const initHandle = category.handle || ""
@@ -134,18 +143,6 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
         }
         setYoutubeUrls(urls)
 
-        savedSnapshotRef.current = {
-          name: initName.trim(),
-          handle: initHandle.trim(),
-          description: initDescription.trim(),
-          rank: initRank,
-          isActive: initActive,
-          isInternal: initInternal,
-          selectedChannels: [...initChannels],
-          youtubeUrls: [...urls],
-          categoryImages: [],
-        }
-
         // Load category media from backend
         loadCategoryImages(category.id, category.image_url || meta?.thumbnail || meta?.image, meta || undefined)
       } else {
@@ -172,9 +169,6 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
             type: img.type === "thumbnail" ? "thumbnail" : img.url === bannerUrl ? "banner" : "image",
           }))
           setCategoryImages(mapped)
-          if (savedSnapshotRef.current) {
-            savedSnapshotRef.current.categoryImages = mapped
-          }
           const thumb = mapped.find((img) => img.type === "thumbnail") || mapped[0]
           if (thumb?.url) setImageUrl(thumb.url)
           return
@@ -187,16 +181,10 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
       if (metadata && Array.isArray(metadata.images)) {
         if (metadata.images.length === 0) {
           setCategoryImages([])
-          if (savedSnapshotRef.current) {
-            savedSnapshotRef.current.categoryImages = []
-          }
           setImageUrl("")
           return
         }
         setCategoryImages(metadata.images)
-        if (savedSnapshotRef.current) {
-          savedSnapshotRef.current.categoryImages = metadata.images
-        }
         const thumb = metadata.images.find((img: any) => img.type === "thumbnail") || metadata.images[0]
         if (thumb?.url) setImageUrl(thumb.url)
         return
@@ -213,9 +201,6 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
         list.push({ url: banner, type: "banner" })
       }
       setCategoryImages(list)
-      if (savedSnapshotRef.current) {
-        savedSnapshotRef.current.categoryImages = list
-      }
     },
     []
   )
@@ -265,8 +250,10 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
       }
 
       toast.success(`${uploadedFiles.length} image(s) uploaded successfully`)
+      triggerSaveNotification("success", `${uploadedFiles.length} image(s) uploaded!`)
     } catch (err: any) {
       toast.error(err?.message || "Failed to upload image")
+      triggerSaveNotification("error", err?.message || "Failed to upload image")
     } finally {
       setIsUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ""
@@ -276,6 +263,8 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
   // Set selected image as Category Thumbnail
   const handleSetThumbnail = async (img: { id?: string; url: string }) => {
     setImageUrl(img.url)
+    setIsDirty(true)
+    setShowDiscardConfirm(false)
     if (img.id) {
       try {
         const currentThumb = categoryImages.find((i) => i.type === "thumbnail")
@@ -307,10 +296,13 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
       )
     }
     toast.success("Designated as category thumbnail (Nav & Cards)")
+    triggerSaveNotification("success", "Designated as category thumbnail (click Save Category)")
   }
 
   // Set selected image as Hero Banner
   const handleSetBanner = (img: { id?: string; url: string }) => {
+    setIsDirty(true)
+    setShowDiscardConfirm(false)
     setCategoryImages((prev) =>
       prev.map((item) => {
         if (item.url === img.url) return { ...item, type: "banner" }
@@ -319,6 +311,7 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
       })
     )
     toast.success("Designated as category hero banner")
+    triggerSaveNotification("success", "Designated as hero banner (click Save Category)")
   }
 
   // Add external URL image to gallery
@@ -335,11 +328,13 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
     setCategoryImages((prev) => [...prev, { url: raw, type: newType }])
     if (isFirst) setImageUrl(raw)
     setManualImageUrl("")
-    toast.success(
-      `Added to gallery as ${
-        newType === "thumbnail" ? "Thumbnail" : newType === "banner" ? "Hero Banner" : "Image"
-      }`
-    )
+    setIsDirty(true)
+    setShowDiscardConfirm(false)
+    const msg = `Added to gallery as ${
+      newType === "thumbnail" ? "Thumbnail" : newType === "banner" ? "Hero Banner" : "Image"
+    } (click Save Category to persist)`
+    toast.success(msg)
+    triggerSaveNotification("success", msg)
   }
 
   // Delete category image with immediate persistence & explicit nulls
@@ -357,9 +352,6 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
     // Update local state immediately
     setCategoryImages(remaining)
     setImageUrl(nextThumb ? nextThumb.url : "")
-    if (savedSnapshotRef.current) {
-      savedSnapshotRef.current.categoryImages = remaining
-    }
 
     const updatedMeta: Record<string, any> = {
       ...(currentMetadata || {}),
@@ -398,15 +390,19 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
       }
       onSuccess(updatedCat)
       toast.success("Image removed and changes saved")
+      triggerSaveNotification("success", "Image removed and changes saved")
     } catch (err: any) {
       console.warn("Could not immediately update category metadata on delete:", err)
       toast.info("Image removed from gallery (remember to save)")
+      triggerSaveNotification("error", "Image removed locally (click Save Category)")
     }
   }
 
   if (!category) return null
 
   const toggleChannel = (channelId: string) => {
+    setIsDirty(true)
+    setShowDiscardConfirm(false)
     setSelectedChannels((prev) =>
       prev.includes(channelId)
         ? prev.filter((id) => id !== channelId)
@@ -420,11 +416,13 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
     const id = extractYouTubeVideoId(raw)
     if (!id) {
       toast.error("Please enter a valid YouTube URL or video ID")
+      triggerSaveNotification("error", "Please enter a valid YouTube URL or video ID")
       return
     }
     const cleanUrl = `https://www.youtube.com/watch?v=${id}`
     if (youtubeUrls.includes(cleanUrl)) {
       toast.error("Video already added")
+      triggerSaveNotification("error", "Video already added")
       return
     }
     const nextUrls = [...youtubeUrls, cleanUrl]
@@ -448,12 +446,11 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
         ...category,
         metadata: updatedMeta,
       })
-      if (savedSnapshotRef.current) {
-        savedSnapshotRef.current.youtubeUrls = nextUrls
-      }
       toast.success("YouTube video added and saved")
+      triggerSaveNotification("success", "YouTube video added and saved!")
     } catch {
       toast.success("YouTube video added")
+      triggerSaveNotification("success", "YouTube video added!")
     }
   }
 
@@ -477,12 +474,11 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
         ...category,
         metadata: updatedMeta,
       })
-      if (savedSnapshotRef.current) {
-        savedSnapshotRef.current.youtubeUrls = nextUrls
-      }
       toast.success("Video removed and changes saved")
+      triggerSaveNotification("success", "Video removed and changes saved!")
     } catch {
       toast.info("Video removed (remember to save)")
+      triggerSaveNotification("error", "Video removed locally (click Save Category)")
     }
   }
 
@@ -495,6 +491,7 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
     }
     if (!name.trim()) {
       toast.error("Category name is required")
+      triggerSaveNotification("error", "Category name is required")
       return
     }
 
@@ -526,10 +523,12 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
         image: (bannerImg?.url || thumbImg?.url) || null,
       }
 
+      // IMPORTANT: Medusa v2 UpdateProductCategory Zod schema defines description: z.string().optional() (NOT nullable).
+      // Sending empty string "" instead of null prevents 400 Bad Request errors when description is blank.
       await sdk.admin.productCategory.update(category.id, {
         name: name.trim(),
         handle: handle.trim() || undefined,
-        description: descValue ? descValue : null,
+        description: descValue,
         rank: Number(rank) || 0,
         is_active: isActive,
         is_internal: isInternal,
@@ -549,24 +548,18 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
         metadata: updatedMetadata,
       }
 
-      toast.success("Category updated successfully")
-      savedSnapshotRef.current = {
-        name: name.trim(),
-        handle: handle.trim(),
-        description: descValue,
-        rank: Number(rank) || 0,
-        isActive,
-        isInternal,
-        selectedChannels: [...selectedChannels],
-        youtubeUrls: [...youtubeUrls],
-        categoryImages: [...categoryImages],
-      }
+      setIsDirty(false)
+      setShowDiscardConfirm(false)
+      toast.success("Category changes saved successfully")
+      triggerSaveNotification("success", "Changes saved successfully!")
       onSuccess(updated)
       if (shouldClose) {
         onOpenChange(false)
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to update category")
+      const errMsg = err?.message || "Failed to update category"
+      toast.error(errMsg)
+      triggerSaveNotification("error", errMsg)
     } finally {
       setIsSubmitting(false)
     }
@@ -585,51 +578,21 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
       onOpenChange(false)
     } catch (err: any) {
       toast.error(err?.message || "Failed to delete category")
+      triggerSaveNotification("error", err?.message || "Failed to delete category")
     } finally {
       setIsDeleting(false)
     }
   }
 
-  const hasUnsavedChanges = useCallback(() => {
-    if (!savedSnapshotRef.current) return false
-    const s = savedSnapshotRef.current
-    if (name.trim() !== s.name) return true
-    if (handle.trim() !== s.handle) return true
-    if (description.trim() !== s.description) return true
-    if ((Number(rank) || 0) !== s.rank) return true
-    if (isActive !== s.isActive) return true
-    if (isInternal !== s.isInternal) return true
-
-    if (s.selectedChannels.length !== selectedChannels.length) return true
-    const sortedCurrent = [...selectedChannels].sort()
-    const sortedSaved = [...s.selectedChannels].sort()
-    if (sortedCurrent.some((c, idx) => c !== sortedSaved[idx])) return true
-
-    if (s.youtubeUrls.length !== youtubeUrls.length) return true
-    if (youtubeUrls.some((u, idx) => u !== s.youtubeUrls[idx])) return true
-
-    if (s.categoryImages.length !== categoryImages.length) return true
-    if (
-      categoryImages.some(
-        (img, idx) =>
-          img.url !== s.categoryImages[idx]?.url || img.type !== s.categoryImages[idx]?.type
-      )
-    ) {
-      return true
-    }
-
-    return false
-  }, [name, handle, description, rank, isActive, isInternal, selectedChannels, youtubeUrls, categoryImages])
-
   const handleClose = useCallback(() => {
-    if (hasUnsavedChanges()) {
-      const confirmDiscard = window.confirm(
-        "You have unsaved changes. Discard changes and close?"
-      )
-      if (!confirmDiscard) return
+    if (isDirty && !showDiscardConfirm) {
+      setShowDiscardConfirm(true)
+      return
     }
+    setIsDirty(false)
+    setShowDiscardConfirm(false)
     onOpenChange(false)
-  }, [hasUnsavedChanges, onOpenChange])
+  }, [isDirty, showDiscardConfirm, onOpenChange])
 
   const handleDrawerOpenChange = useCallback(
     (newOpen: boolean) => {
@@ -753,7 +716,11 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
                   <Input
                     id="edit-name"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => {
+                      setName(e.target.value)
+                      setIsDirty(true)
+                      setShowDiscardConfirm(false)
+                    }}
                     required
                   />
                 </div>
@@ -765,7 +732,11 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
                   <Input
                     id="edit-handle"
                     value={handle}
-                    onChange={(e) => setHandle(e.target.value)}
+                    onChange={(e) => {
+                      setHandle(e.target.value)
+                      setIsDirty(true)
+                      setShowDiscardConfirm(false)
+                    }}
                     placeholder="e.g. rayon-embroidery-thread"
                   />
                 </div>
@@ -786,13 +757,21 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
                       type="number"
                       size="small"
                       value={rank}
-                      onChange={(e) => setRank(Number(e.target.value))}
+                      onChange={(e) => {
+                        setRank(Number(e.target.value))
+                        setIsDirty(true)
+                        setShowDiscardConfirm(false)
+                      }}
                       className="w-24"
                     />
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => setRank((r) => Math.max(0, r - 1))}
+                        onClick={() => {
+                          setRank((r) => Math.max(0, r - 1))
+                          setIsDirty(true)
+                          setShowDiscardConfirm(false)
+                        }}
                         className="px-2 py-1 text-xs font-medium rounded border border-ui-border-base bg-ui-bg-base hover:bg-ui-bg-subtle transition-colors cursor-pointer"
                         title="Move Earlier in Storefront"
                       >
@@ -800,7 +779,11 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setRank((r) => r + 1)}
+                        onClick={() => {
+                          setRank((r) => r + 1)
+                          setIsDirty(true)
+                          setShowDiscardConfirm(false)
+                        }}
                         className="px-2 py-1 text-xs font-medium rounded border border-ui-border-base bg-ui-bg-base hover:bg-ui-bg-subtle transition-colors cursor-pointer"
                         title="Move Later in Storefront"
                       >
@@ -808,7 +791,11 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setRank(0)}
+                        onClick={() => {
+                          setRank(0)
+                          setIsDirty(true)
+                          setShowDiscardConfirm(false)
+                        }}
                         className="px-2 py-1 text-xs font-medium rounded border border-ui-border-base bg-ui-bg-base hover:bg-ui-bg-subtle transition-colors cursor-pointer"
                         title="Set as First Category"
                       >
@@ -828,7 +815,11 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
                   <Textarea
                     id="edit-desc"
                     value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    onChange={(e) => {
+                      setDescription(e.target.value)
+                      setIsDirty(true)
+                      setShowDiscardConfirm(false)
+                    }}
                     rows={3}
                   />
                 </div>
@@ -840,7 +831,14 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
                       Visible to shoppers on enabled storefronts
                     </Text>
                   </div>
-                  <Switch checked={isActive} onCheckedChange={setIsActive} />
+                  <Switch
+                    checked={isActive}
+                    onCheckedChange={(val) => {
+                      setIsActive(val)
+                      setIsDirty(true)
+                      setShowDiscardConfirm(false)
+                    }}
+                  />
                 </div>
 
                 <div className="flex items-center justify-between">
@@ -850,7 +848,14 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
                       Hidden from public storefront navigation
                     </Text>
                   </div>
-                  <Switch checked={isInternal} onCheckedChange={setIsInternal} />
+                  <Switch
+                    checked={isInternal}
+                    onCheckedChange={(val) => {
+                      setIsInternal(val)
+                      setIsDirty(true)
+                      setShowDiscardConfirm(false)
+                    }}
+                  />
                 </div>
 
                 <div className="pt-3 border-t border-ui-border-base">
@@ -1066,21 +1071,23 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
                     <p className="text-[11px] text-ui-fg-muted">
                       Or paste a direct image URL (S3, Cloudinary, Imgur, Supabase) to link without uploading.
                     </p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Input
-                        size="small"
-                        type="url"
-                        placeholder="https://example.com/category-image.jpg"
-                        value={manualImageUrl}
-                        onChange={(e) => setManualImageUrl(e.target.value)}
-                        className="text-xs flex-1"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault()
-                            handleAddManualImage()
-                          }
-                        }}
-                      />
+                    <div className="flex items-center gap-2 mt-1 w-full">
+                      <div className="flex-1 min-w-[360px] sm:min-w-[500px]">
+                        <Input
+                          size="small"
+                          type="url"
+                          placeholder="https://example.com/category-image.jpg"
+                          value={manualImageUrl}
+                          onChange={(e) => setManualImageUrl(e.target.value)}
+                          className="text-xs w-full"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault()
+                              handleAddManualImage()
+                            }
+                          }}
+                        />
+                      </div>
                       <Button
                         type="button"
                         size="small"
@@ -1110,20 +1117,22 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <Input
-                    size="small"
-                    placeholder="Paste YouTube watch URL, shorts, or video ID…"
-                    value={newYoutubeInput}
-                    onChange={(e) => setNewYoutubeInput(e.target.value)}
-                    className="flex-1 text-xs"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault()
-                        handleAddYoutube()
-                      }
-                    }}
-                  />
+                <div className="flex items-center gap-2 w-full">
+                  <div className="flex-1 min-w-[360px] sm:min-w-[500px]">
+                    <Input
+                      size="small"
+                      placeholder="Paste YouTube watch URL, shorts, or video ID…"
+                      value={newYoutubeInput}
+                      onChange={(e) => setNewYoutubeInput(e.target.value)}
+                      className="w-full text-xs"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault()
+                          handleAddYoutube()
+                        }
+                      }}
+                    />
+                  </div>
                   <Button
                     size="small"
                     type="button"
@@ -1179,25 +1188,74 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
             )}
           </Drawer.Body>
 
-          <Drawer.Footer className="flex justify-end gap-2 px-6 py-4 border-t border-ui-border-base">
-            <Button
-              type="button"
-              variant="secondary"
-              size="small"
-              onClick={handleClose}
-              disabled={isSubmitting || isDeleting}
-            >
-              Close
-            </Button>
-            <Button
-              type="button"
-              size="small"
-              onClick={() => handleSubmit(false)}
-              isLoading={isSubmitting}
-              disabled={isSubmitting || !name.trim() || isDeleting}
-            >
-              Save Category
-            </Button>
+          <Drawer.Footer className="flex flex-col gap-2 px-6 py-4 border-t border-ui-border-base">
+            {showDiscardConfirm && (
+              <div className="flex items-center justify-between gap-3 w-full px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs">
+                <span className="font-medium">
+                  You have unsaved changes. Discard changes and close?
+                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    type="button"
+                    size="small"
+                    variant="secondary"
+                    onClick={() => setShowDiscardConfirm(false)}
+                  >
+                    Keep Editing
+                  </Button>
+                  <Button
+                    type="button"
+                    size="small"
+                    variant="danger"
+                    onClick={() => {
+                      setIsDirty(false)
+                      setShowDiscardConfirm(false)
+                      onOpenChange(false)
+                    }}
+                  >
+                    Discard & Close
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between w-full gap-2">
+              <div className="flex items-center">
+                {saveNotification && (
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold shadow-2xs ${
+                      saveNotification.type === "success"
+                        ? "bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-800"
+                        : "bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-950 dark:text-rose-200 dark:border-rose-800"
+                    }`}
+                  >
+                    {saveNotification.type === "success" ? "✓ " : "⚠ "}
+                    {saveNotification.message}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 ml-auto">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="small"
+                  onClick={handleClose}
+                  disabled={isSubmitting || isDeleting}
+                >
+                  Close
+                </Button>
+                <Button
+                  type="button"
+                  size="small"
+                  onClick={() => handleSubmit(false)}
+                  isLoading={isSubmitting}
+                  disabled={isSubmitting || !name.trim() || isDeleting}
+                >
+                  {saveNotification?.type === "success" ? "✓ Saved!" : "Save Category"}
+                </Button>
+              </div>
+            </div>
           </Drawer.Footer>
         </div>
       </Drawer.Content>
