@@ -55,8 +55,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
-    "prepublishOnly": "npm run build"
+    "build": "tsc"
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.4",
