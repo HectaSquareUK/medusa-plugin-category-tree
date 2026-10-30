@@ -1,6 +1,6 @@
 {
   "name": "@hectasquare/medusa-plugin-category-tree",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "description": "AAA Interactive Category Tree & Mind Map for Medusa v2 Admin with drag-and-drop reparenting, tier indicators, superscript ranks, multi-storefront filtering, and NotebookLM-style subtree collapse.",
   "author": "HectaSquare Team",
   "license": "Apache-2.0",
