@@ -162,19 +162,44 @@ export function computeMoves(
   current: CategoryTreeNode[]
 ): CategoryMoveItem[] {
   const origMap = new Map(original.map((c) => [c.id, c]))
-  const moves: CategoryMoveItem[] = []
+  const dirtyParents = new Set<string | null>()
 
   for (const c of current) {
     const orig = origMap.get(c.id)
     if (!orig) continue
 
     if (orig.parent_category_id !== c.parent_category_id || orig.rank !== c.rank) {
-      moves.push({
-        id: c.id,
-        parent_category_id: c.parent_category_id,
-        rank: c.rank,
-      })
+      dirtyParents.add(c.parent_category_id || null)
+      if (orig.parent_category_id !== c.parent_category_id) {
+        dirtyParents.add(orig.parent_category_id || null)
+      }
     }
+  }
+
+  if (dirtyParents.size === 0) return []
+
+  // For every dirty parent group, emit all its current children with contiguous ranks
+  const moves: CategoryMoveItem[] = []
+  const grouped = new Map<string | null, CategoryTreeNode[]>()
+
+  for (const c of current) {
+    const p = c.parent_category_id || null
+    if (dirtyParents.has(p)) {
+      const list = grouped.get(p) || []
+      list.push(c)
+      grouped.set(p, list)
+    }
+  }
+
+  for (const [parentId, siblings] of grouped.entries()) {
+    siblings.sort(compareCategories)
+    siblings.forEach((s, idx) => {
+      moves.push({
+        id: s.id,
+        parent_category_id: parentId,
+        rank: idx,
+      })
+    })
   }
 
   return moves

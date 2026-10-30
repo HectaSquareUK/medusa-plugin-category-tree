@@ -72,35 +72,89 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
   const [categoryImages, setCategoryImages] = useState<Array<{ id?: string; url: string; type?: string; file_id?: string }>>([])
   const [manualImageUrl, setManualImageUrl] = useState("")
 
+  interface FormSnapshot {
+    name: string
+    handle: string
+    description: string
+    rank: number
+    isActive: boolean
+    isInternal: boolean
+    selectedChannels: string[]
+    youtubeUrls: string[]
+    categoryImages: Array<{ id?: string; url: string; type?: string; file_id?: string }>
+  }
+
+  const prevCategoryIdRef = useRef<string | null>(null)
+  const savedSnapshotRef = useRef<FormSnapshot | null>(null)
+
+  useEffect(() => {
+    if (!open) {
+      prevCategoryIdRef.current = null
+      savedSnapshotRef.current = null
+    }
+  }, [open])
+
   useEffect(() => {
     if (category) {
-      setName(category.name || "")
-      setHandle(category.handle || "")
-      setDescription(category.description || (category.metadata as any)?.description || "")
-      setImageUrl(category.image_url || "")
-      setRank(category.rank ?? 0)
-      setIsActive(Boolean(category.is_active))
-      setIsInternal(Boolean(category.is_internal))
-      setSelectedChannels(category.sales_channels || salesChannels.map((s) => s.id))
-      setCurrentMetadata((category.metadata as Record<string, any>) || {})
+      const isNewCategory = prevCategoryIdRef.current !== category.id
+      if (isNewCategory) {
+        prevCategoryIdRef.current = category.id
+        setActiveTab("general")
 
-      // Parse YouTube URLs from metadata (including legacy fields)
-      const meta = category.metadata as Record<string, any> | null
-      const urls: string[] = []
-      if (meta?.youtube_urls && Array.isArray(meta.youtube_urls)) {
-        meta.youtube_urls.forEach((u) => typeof u === "string" && u.trim() && urls.push(u.trim()))
-      } else if (meta?.youtube_url && typeof meta.youtube_url === "string" && meta.youtube_url.trim()) {
-        urls.push(meta.youtube_url.trim())
-      } else if (meta?.youtube_link && typeof meta.youtube_link === "string" && meta.youtube_link.trim()) {
-        urls.push(meta.youtube_link.trim())
-      } else if (meta?.video_url && typeof meta.video_url === "string" && meta.video_url.trim()) {
-        urls.push(meta.video_url.trim())
+        const initName = category.name || ""
+        const initHandle = category.handle || ""
+        const initDescription = category.description || (category.metadata as any)?.description || ""
+        const initRank = category.rank ?? 0
+        const initActive = Boolean(category.is_active)
+        const initInternal = Boolean(category.is_internal)
+        const initChannels = category.sales_channels || salesChannels.map((s) => s.id)
+        const initMetadata = (category.metadata as Record<string, any>) || {}
+
+        setName(initName)
+        setHandle(initHandle)
+        setDescription(initDescription)
+        setImageUrl(category.image_url || "")
+        setRank(initRank)
+        setIsActive(initActive)
+        setIsInternal(initInternal)
+        setSelectedChannels(initChannels)
+        setCurrentMetadata(initMetadata)
+
+        // Parse YouTube URLs from metadata (including legacy fields)
+        const meta = category.metadata as Record<string, any> | null
+        const urls: string[] = []
+        if (meta?.youtube_urls && Array.isArray(meta.youtube_urls)) {
+          meta.youtube_urls.forEach((u) => typeof u === "string" && u.trim() && urls.push(u.trim()))
+        } else if (meta?.youtube_url && typeof meta.youtube_url === "string" && meta.youtube_url.trim()) {
+          urls.push(meta.youtube_url.trim())
+        } else if (meta?.youtube_link && typeof meta.youtube_link === "string" && meta.youtube_link.trim()) {
+          urls.push(meta.youtube_link.trim())
+        } else if (meta?.video_url && typeof meta.video_url === "string" && meta.video_url.trim()) {
+          urls.push(meta.video_url.trim())
+        }
+        setYoutubeUrls(urls)
+
+        savedSnapshotRef.current = {
+          name: initName.trim(),
+          handle: initHandle.trim(),
+          description: initDescription.trim(),
+          rank: initRank,
+          isActive: initActive,
+          isInternal: initInternal,
+          selectedChannels: [...initChannels],
+          youtubeUrls: [...urls],
+          categoryImages: [],
+        }
+
+        // Load category media from backend
+        loadCategoryImages(category.id, category.image_url || meta?.thumbnail || meta?.image, meta || undefined)
+      } else {
+        // Drawer is already open for this exact category:
+        // Do NOT switch activeTab back to general. Keep user's active tab.
+        if (category.metadata) {
+          setCurrentMetadata((prev) => ({ ...prev, ...(category.metadata as Record<string, any>) }))
+        }
       }
-      setYoutubeUrls(urls)
-      setActiveTab("general")
-
-      // Load category media from backend
-      loadCategoryImages(category.id, category.image_url || meta?.thumbnail || meta?.image, meta || undefined)
     }
   }, [category, salesChannels])
 
@@ -118,6 +172,9 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
             type: img.type === "thumbnail" ? "thumbnail" : img.url === bannerUrl ? "banner" : "image",
           }))
           setCategoryImages(mapped)
+          if (savedSnapshotRef.current) {
+            savedSnapshotRef.current.categoryImages = mapped
+          }
           const thumb = mapped.find((img) => img.type === "thumbnail") || mapped[0]
           if (thumb?.url) setImageUrl(thumb.url)
           return
@@ -130,10 +187,16 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
       if (metadata && Array.isArray(metadata.images)) {
         if (metadata.images.length === 0) {
           setCategoryImages([])
+          if (savedSnapshotRef.current) {
+            savedSnapshotRef.current.categoryImages = []
+          }
           setImageUrl("")
           return
         }
         setCategoryImages(metadata.images)
+        if (savedSnapshotRef.current) {
+          savedSnapshotRef.current.categoryImages = metadata.images
+        }
         const thumb = metadata.images.find((img: any) => img.type === "thumbnail") || metadata.images[0]
         if (thumb?.url) setImageUrl(thumb.url)
         return
@@ -150,6 +213,9 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
         list.push({ url: banner, type: "banner" })
       }
       setCategoryImages(list)
+      if (savedSnapshotRef.current) {
+        savedSnapshotRef.current.categoryImages = list
+      }
     },
     []
   )
@@ -291,6 +357,9 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
     // Update local state immediately
     setCategoryImages(remaining)
     setImageUrl(nextThumb ? nextThumb.url : "")
+    if (savedSnapshotRef.current) {
+      savedSnapshotRef.current.categoryImages = remaining
+    }
 
     const updatedMeta: Record<string, any> = {
       ...(currentMetadata || {}),
@@ -379,6 +448,9 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
         ...category,
         metadata: updatedMeta,
       })
+      if (savedSnapshotRef.current) {
+        savedSnapshotRef.current.youtubeUrls = nextUrls
+      }
       toast.success("YouTube video added and saved")
     } catch {
       toast.success("YouTube video added")
@@ -405,6 +477,9 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
         ...category,
         metadata: updatedMeta,
       })
+      if (savedSnapshotRef.current) {
+        savedSnapshotRef.current.youtubeUrls = nextUrls
+      }
       toast.success("Video removed and changes saved")
     } catch {
       toast.info("Video removed (remember to save)")
@@ -475,6 +550,17 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
       }
 
       toast.success("Category updated successfully")
+      savedSnapshotRef.current = {
+        name: name.trim(),
+        handle: handle.trim(),
+        description: descValue,
+        rank: Number(rank) || 0,
+        isActive,
+        isInternal,
+        selectedChannels: [...selectedChannels],
+        youtubeUrls: [...youtubeUrls],
+        categoryImages: [...categoryImages],
+      }
       onSuccess(updated)
       if (shouldClose) {
         onOpenChange(false)
@@ -504,8 +590,60 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
     }
   }
 
+  const hasUnsavedChanges = useCallback(() => {
+    if (!savedSnapshotRef.current) return false
+    const s = savedSnapshotRef.current
+    if (name.trim() !== s.name) return true
+    if (handle.trim() !== s.handle) return true
+    if (description.trim() !== s.description) return true
+    if ((Number(rank) || 0) !== s.rank) return true
+    if (isActive !== s.isActive) return true
+    if (isInternal !== s.isInternal) return true
+
+    if (s.selectedChannels.length !== selectedChannels.length) return true
+    const sortedCurrent = [...selectedChannels].sort()
+    const sortedSaved = [...s.selectedChannels].sort()
+    if (sortedCurrent.some((c, idx) => c !== sortedSaved[idx])) return true
+
+    if (s.youtubeUrls.length !== youtubeUrls.length) return true
+    if (youtubeUrls.some((u, idx) => u !== s.youtubeUrls[idx])) return true
+
+    if (s.categoryImages.length !== categoryImages.length) return true
+    if (
+      categoryImages.some(
+        (img, idx) =>
+          img.url !== s.categoryImages[idx]?.url || img.type !== s.categoryImages[idx]?.type
+      )
+    ) {
+      return true
+    }
+
+    return false
+  }, [name, handle, description, rank, isActive, isInternal, selectedChannels, youtubeUrls, categoryImages])
+
+  const handleClose = useCallback(() => {
+    if (hasUnsavedChanges()) {
+      const confirmDiscard = window.confirm(
+        "You have unsaved changes. Discard changes and close?"
+      )
+      if (!confirmDiscard) return
+    }
+    onOpenChange(false)
+  }, [hasUnsavedChanges, onOpenChange])
+
+  const handleDrawerOpenChange = useCallback(
+    (newOpen: boolean) => {
+      if (!newOpen) {
+        handleClose()
+      } else {
+        onOpenChange(true)
+      }
+    },
+    [handleClose, onOpenChange]
+  )
+
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer open={open} onOpenChange={handleDrawerOpenChange}>
       <Drawer.Content
         className={`transition-all duration-300 w-full z-50 ${
           isFullScreen
@@ -1046,13 +1184,7 @@ export const EditCategoryDrawer: React.FC<EditCategoryDrawerProps> = ({
               type="button"
               variant="secondary"
               size="small"
-              onClick={() => {
-                if (name.trim()) {
-                  handleSubmit(true)
-                } else {
-                  onOpenChange(false)
-                }
-              }}
+              onClick={handleClose}
               disabled={isSubmitting || isDeleting}
             >
               Close

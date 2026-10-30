@@ -47,36 +47,74 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
     const [isUploading, setIsUploading] = (0, react_1.useState)(false);
     const [categoryImages, setCategoryImages] = (0, react_1.useState)([]);
     const [manualImageUrl, setManualImageUrl] = (0, react_1.useState)("");
+    const prevCategoryIdRef = (0, react_1.useRef)(null);
+    const savedSnapshotRef = (0, react_1.useRef)(null);
+    (0, react_1.useEffect)(() => {
+        if (!open) {
+            prevCategoryIdRef.current = null;
+            savedSnapshotRef.current = null;
+        }
+    }, [open]);
     (0, react_1.useEffect)(() => {
         if (category) {
-            setName(category.name || "");
-            setHandle(category.handle || "");
-            setDescription(category.description || category.metadata?.description || "");
-            setImageUrl(category.image_url || "");
-            setRank(category.rank ?? 0);
-            setIsActive(Boolean(category.is_active));
-            setIsInternal(Boolean(category.is_internal));
-            setSelectedChannels(category.sales_channels || salesChannels.map((s) => s.id));
-            setCurrentMetadata(category.metadata || {});
-            // Parse YouTube URLs from metadata (including legacy fields)
-            const meta = category.metadata;
-            const urls = [];
-            if (meta?.youtube_urls && Array.isArray(meta.youtube_urls)) {
-                meta.youtube_urls.forEach((u) => typeof u === "string" && u.trim() && urls.push(u.trim()));
+            const isNewCategory = prevCategoryIdRef.current !== category.id;
+            if (isNewCategory) {
+                prevCategoryIdRef.current = category.id;
+                setActiveTab("general");
+                const initName = category.name || "";
+                const initHandle = category.handle || "";
+                const initDescription = category.description || category.metadata?.description || "";
+                const initRank = category.rank ?? 0;
+                const initActive = Boolean(category.is_active);
+                const initInternal = Boolean(category.is_internal);
+                const initChannels = category.sales_channels || salesChannels.map((s) => s.id);
+                const initMetadata = category.metadata || {};
+                setName(initName);
+                setHandle(initHandle);
+                setDescription(initDescription);
+                setImageUrl(category.image_url || "");
+                setRank(initRank);
+                setIsActive(initActive);
+                setIsInternal(initInternal);
+                setSelectedChannels(initChannels);
+                setCurrentMetadata(initMetadata);
+                // Parse YouTube URLs from metadata (including legacy fields)
+                const meta = category.metadata;
+                const urls = [];
+                if (meta?.youtube_urls && Array.isArray(meta.youtube_urls)) {
+                    meta.youtube_urls.forEach((u) => typeof u === "string" && u.trim() && urls.push(u.trim()));
+                }
+                else if (meta?.youtube_url && typeof meta.youtube_url === "string" && meta.youtube_url.trim()) {
+                    urls.push(meta.youtube_url.trim());
+                }
+                else if (meta?.youtube_link && typeof meta.youtube_link === "string" && meta.youtube_link.trim()) {
+                    urls.push(meta.youtube_link.trim());
+                }
+                else if (meta?.video_url && typeof meta.video_url === "string" && meta.video_url.trim()) {
+                    urls.push(meta.video_url.trim());
+                }
+                setYoutubeUrls(urls);
+                savedSnapshotRef.current = {
+                    name: initName.trim(),
+                    handle: initHandle.trim(),
+                    description: initDescription.trim(),
+                    rank: initRank,
+                    isActive: initActive,
+                    isInternal: initInternal,
+                    selectedChannels: [...initChannels],
+                    youtubeUrls: [...urls],
+                    categoryImages: [],
+                };
+                // Load category media from backend
+                loadCategoryImages(category.id, category.image_url || meta?.thumbnail || meta?.image, meta || undefined);
             }
-            else if (meta?.youtube_url && typeof meta.youtube_url === "string" && meta.youtube_url.trim()) {
-                urls.push(meta.youtube_url.trim());
+            else {
+                // Drawer is already open for this exact category:
+                // Do NOT switch activeTab back to general. Keep user's active tab.
+                if (category.metadata) {
+                    setCurrentMetadata((prev) => ({ ...prev, ...category.metadata }));
+                }
             }
-            else if (meta?.youtube_link && typeof meta.youtube_link === "string" && meta.youtube_link.trim()) {
-                urls.push(meta.youtube_link.trim());
-            }
-            else if (meta?.video_url && typeof meta.video_url === "string" && meta.video_url.trim()) {
-                urls.push(meta.video_url.trim());
-            }
-            setYoutubeUrls(urls);
-            setActiveTab("general");
-            // Load category media from backend
-            loadCategoryImages(category.id, category.image_url || meta?.thumbnail || meta?.image, meta || undefined);
         }
     }, [category, salesChannels]);
     // Load existing category media gallery
@@ -90,6 +128,9 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
                     type: img.type === "thumbnail" ? "thumbnail" : img.url === bannerUrl ? "banner" : "image",
                 }));
                 setCategoryImages(mapped);
+                if (savedSnapshotRef.current) {
+                    savedSnapshotRef.current.categoryImages = mapped;
+                }
                 const thumb = mapped.find((img) => img.type === "thumbnail") || mapped[0];
                 if (thumb?.url)
                     setImageUrl(thumb.url);
@@ -103,10 +144,16 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
         if (metadata && Array.isArray(metadata.images)) {
             if (metadata.images.length === 0) {
                 setCategoryImages([]);
+                if (savedSnapshotRef.current) {
+                    savedSnapshotRef.current.categoryImages = [];
+                }
                 setImageUrl("");
                 return;
             }
             setCategoryImages(metadata.images);
+            if (savedSnapshotRef.current) {
+                savedSnapshotRef.current.categoryImages = metadata.images;
+            }
             const thumb = metadata.images.find((img) => img.type === "thumbnail") || metadata.images[0];
             if (thumb?.url)
                 setImageUrl(thumb.url);
@@ -123,6 +170,9 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
             list.push({ url: banner, type: "banner" });
         }
         setCategoryImages(list);
+        if (savedSnapshotRef.current) {
+            savedSnapshotRef.current.categoryImages = list;
+        }
     }, []);
     // Universal S3/Storage Media Upload Handler (works with AWS S3, MinIO, Cloudflare R2, Local)
     const handleFileUpload = async (files) => {
@@ -249,6 +299,9 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
         // Update local state immediately
         setCategoryImages(remaining);
         setImageUrl(nextThumb ? nextThumb.url : "");
+        if (savedSnapshotRef.current) {
+            savedSnapshotRef.current.categoryImages = remaining;
+        }
         const updatedMeta = {
             ...(currentMetadata || {}),
             images: remaining,
@@ -331,6 +384,9 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
                 ...category,
                 metadata: updatedMeta,
             });
+            if (savedSnapshotRef.current) {
+                savedSnapshotRef.current.youtubeUrls = nextUrls;
+            }
             ui_1.toast.success("YouTube video added and saved");
         }
         catch {
@@ -356,6 +412,9 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
                 ...category,
                 metadata: updatedMeta,
             });
+            if (savedSnapshotRef.current) {
+                savedSnapshotRef.current.youtubeUrls = nextUrls;
+            }
             ui_1.toast.success("Video removed and changes saved");
         }
         catch {
@@ -419,6 +478,17 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
                 metadata: updatedMetadata,
             };
             ui_1.toast.success("Category updated successfully");
+            savedSnapshotRef.current = {
+                name: name.trim(),
+                handle: handle.trim(),
+                description: descValue,
+                rank: Number(rank) || 0,
+                isActive,
+                isInternal,
+                selectedChannels: [...selectedChannels],
+                youtubeUrls: [...youtubeUrls],
+                categoryImages: [...categoryImages],
+            };
             onSuccess(updated);
             if (shouldClose) {
                 onOpenChange(false);
@@ -449,7 +519,56 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
             setIsDeleting(false);
         }
     };
-    return ((0, jsx_runtime_1.jsx)(ui_1.Drawer, { open: open, onOpenChange: onOpenChange, children: (0, jsx_runtime_1.jsx)(ui_1.Drawer.Content, { className: `transition-all duration-300 w-full z-50 ${isFullScreen
+    const hasUnsavedChanges = (0, react_1.useCallback)(() => {
+        if (!savedSnapshotRef.current)
+            return false;
+        const s = savedSnapshotRef.current;
+        if (name.trim() !== s.name)
+            return true;
+        if (handle.trim() !== s.handle)
+            return true;
+        if (description.trim() !== s.description)
+            return true;
+        if ((Number(rank) || 0) !== s.rank)
+            return true;
+        if (isActive !== s.isActive)
+            return true;
+        if (isInternal !== s.isInternal)
+            return true;
+        if (s.selectedChannels.length !== selectedChannels.length)
+            return true;
+        const sortedCurrent = [...selectedChannels].sort();
+        const sortedSaved = [...s.selectedChannels].sort();
+        if (sortedCurrent.some((c, idx) => c !== sortedSaved[idx]))
+            return true;
+        if (s.youtubeUrls.length !== youtubeUrls.length)
+            return true;
+        if (youtubeUrls.some((u, idx) => u !== s.youtubeUrls[idx]))
+            return true;
+        if (s.categoryImages.length !== categoryImages.length)
+            return true;
+        if (categoryImages.some((img, idx) => img.url !== s.categoryImages[idx]?.url || img.type !== s.categoryImages[idx]?.type)) {
+            return true;
+        }
+        return false;
+    }, [name, handle, description, rank, isActive, isInternal, selectedChannels, youtubeUrls, categoryImages]);
+    const handleClose = (0, react_1.useCallback)(() => {
+        if (hasUnsavedChanges()) {
+            const confirmDiscard = window.confirm("You have unsaved changes. Discard changes and close?");
+            if (!confirmDiscard)
+                return;
+        }
+        onOpenChange(false);
+    }, [hasUnsavedChanges, onOpenChange]);
+    const handleDrawerOpenChange = (0, react_1.useCallback)((newOpen) => {
+        if (!newOpen) {
+            handleClose();
+        }
+        else {
+            onOpenChange(true);
+        }
+    }, [handleClose, onOpenChange]);
+    return ((0, jsx_runtime_1.jsx)(ui_1.Drawer, { open: open, onOpenChange: handleDrawerOpenChange, children: (0, jsx_runtime_1.jsx)(ui_1.Drawer.Content, { className: `transition-all duration-300 w-full z-50 ${isFullScreen
                 ? "!max-w-full !w-screen !h-screen !inset-0 !rounded-none"
                 : "max-w-5xl xl:max-w-6xl w-[92vw]"}`, children: (0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col h-full", children: [(0, jsx_runtime_1.jsxs)(ui_1.Drawer.Header, { className: "border-b border-ui-border-base pb-3", children: [(0, jsx_runtime_1.jsxs)("div", { className: "flex items-center justify-between w-full", children: [(0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)(ui_1.Drawer.Title, { className: "text-base font-semibold text-ui-fg-base", children: category.name }), (0, jsx_runtime_1.jsxs)(ui_1.Drawer.Description, { className: "text-xs text-ui-fg-muted mt-0.5", children: ["Tier ", category.tier, " \u2022 ID: ", category.id] })] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-2", children: [(0, jsx_runtime_1.jsxs)("button", { type: "button", onClick: () => setIsFullScreen((prev) => !prev), className: "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-ui-fg-subtle hover:text-ui-fg-base rounded-lg border border-ui-border-base bg-ui-bg-subtle hover:bg-ui-bg-base shadow-2xs transition-colors cursor-pointer", title: isFullScreen ? "Exit Fullscreen" : "Expand to Full Page Modal", children: [(0, jsx_runtime_1.jsx)(icons_1.ArrowsPointingOut, { className: "w-3.5 h-3.5" }), (0, jsx_runtime_1.jsx)("span", { children: isFullScreen ? "Exit Fullscreen" : "Full Page" })] }), (0, jsx_runtime_1.jsxs)("button", { type: "button", onClick: () => window.open(`/app/categories/${category.id}`, "_blank"), className: "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-ui-fg-subtle hover:text-ui-fg-base rounded-lg border border-ui-border-base bg-ui-bg-subtle hover:bg-ui-bg-base shadow-2xs transition-colors cursor-pointer", title: "Open full category details page in a new tab", children: [(0, jsx_runtime_1.jsx)("span", { children: "Open Full Page" }), (0, jsx_runtime_1.jsx)(icons_1.ArrowUpRightMicro, { className: "w-3.5 h-3.5" })] })] })] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-1 mt-3 border-b border-ui-border-base -mb-3", children: [(0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => setActiveTab("general"), className: `px-3 py-1.5 text-xs font-medium border-b-2 transition-colors cursor-pointer ${activeTab === "general"
                                             ? "border-blue-600 text-blue-600 font-semibold"
@@ -509,13 +628,6 @@ const EditCategoryDrawer = ({ open, onOpenChange, category, salesChannels, onSuc
                                             const id = extractYouTubeVideoId(url);
                                             const thumb = id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;
                                             return ((0, jsx_runtime_1.jsxs)("div", { className: "flex flex-col border border-ui-border-base rounded-xl overflow-hidden bg-ui-bg-subtle/40 shadow-xs", children: [(0, jsx_runtime_1.jsxs)("div", { className: "relative aspect-video bg-black/80 overflow-hidden flex items-center justify-center", children: [thumb ? ((0, jsx_runtime_1.jsx)("img", { src: thumb, alt: "YouTube Preview", className: "w-full h-full object-cover" })) : ((0, jsx_runtime_1.jsx)("span", { className: "text-xs text-white", children: "Video" })), (0, jsx_runtime_1.jsx)("button", { type: "button", onClick: () => handleRemoveYoutube(url), className: "absolute top-1.5 right-1.5 p-1 bg-black/70 hover:bg-rose-600 text-white rounded-full transition-colors cursor-pointer", title: "Remove video", children: (0, jsx_runtime_1.jsx)(icons_1.Trash, { className: "w-3 h-3" }) })] }), (0, jsx_runtime_1.jsx)("div", { className: "p-2", children: (0, jsx_runtime_1.jsx)("span", { className: "text-[10px] text-ui-fg-muted truncate block font-mono", title: url, children: url }) })] }, url));
-                                        }) }))] }))] }), (0, jsx_runtime_1.jsxs)(ui_1.Drawer.Footer, { className: "flex justify-end gap-2 px-6 py-4 border-t border-ui-border-base", children: [(0, jsx_runtime_1.jsx)(ui_1.Button, { type: "button", variant: "secondary", size: "small", onClick: () => {
-                                    if (name.trim()) {
-                                        handleSubmit(true);
-                                    }
-                                    else {
-                                        onOpenChange(false);
-                                    }
-                                }, disabled: isSubmitting || isDeleting, children: "Close" }), (0, jsx_runtime_1.jsx)(ui_1.Button, { type: "button", size: "small", onClick: () => handleSubmit(false), isLoading: isSubmitting, disabled: isSubmitting || !name.trim() || isDeleting, children: "Save Category" })] })] }) }) }));
+                                        }) }))] }))] }), (0, jsx_runtime_1.jsxs)(ui_1.Drawer.Footer, { className: "flex justify-end gap-2 px-6 py-4 border-t border-ui-border-base", children: [(0, jsx_runtime_1.jsx)(ui_1.Button, { type: "button", variant: "secondary", size: "small", onClick: handleClose, disabled: isSubmitting || isDeleting, children: "Close" }), (0, jsx_runtime_1.jsx)(ui_1.Button, { type: "button", size: "small", onClick: () => handleSubmit(false), isLoading: isSubmitting, disabled: isSubmitting || !name.trim() || isDeleting, children: "Save Category" })] })] }) }) }));
 };
 exports.EditCategoryDrawer = EditCategoryDrawer;

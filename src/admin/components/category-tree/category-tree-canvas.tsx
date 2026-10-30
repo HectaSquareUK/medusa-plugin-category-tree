@@ -150,44 +150,14 @@ const CanvasInner: React.FC = () => {
 
   const handleMoveSiblingUp = useCallback((id: string) => {
     setCategories((prev) => {
-      const { nextCategories, siblingMoves } = moveSiblingRank(prev, id, "up")
-      if (siblingMoves.length > 0) {
-        // AAA Realtime: Immediately auto-persist contiguous ranks to backend in background
-        sdk.client
-          .fetch("/admin/category-tree/reorder", {
-            method: "POST",
-            body: { moves: siblingMoves },
-          })
-          .then(() => {
-            setOriginalCategories([...nextCategories])
-          })
-          .catch((err: any) => {
-            console.error("Failed to auto-save sibling rank:", err)
-            toast.error("Failed to save ranking: " + (err.message || "Unknown error"))
-          })
-      }
+      const { nextCategories } = moveSiblingRank(prev, id, "up")
       return nextCategories
     })
   }, [])
 
   const handleMoveSiblingDown = useCallback((id: string) => {
     setCategories((prev) => {
-      const { nextCategories, siblingMoves } = moveSiblingRank(prev, id, "down")
-      if (siblingMoves.length > 0) {
-        // AAA Realtime: Immediately auto-persist contiguous ranks to backend in background
-        sdk.client
-          .fetch("/admin/category-tree/reorder", {
-            method: "POST",
-            body: { moves: siblingMoves },
-          })
-          .then(() => {
-            setOriginalCategories([...nextCategories])
-          })
-          .catch((err: any) => {
-            console.error("Failed to auto-save sibling rank:", err)
-            toast.error("Failed to save ranking: " + (err.message || "Unknown error"))
-          })
-      }
+      const { nextCategories } = moveSiblingRank(prev, id, "down")
       return nextCategories
     })
   }, [])
@@ -365,7 +335,7 @@ const CanvasInner: React.FC = () => {
         body: { moves: dirtyMoves },
       })
       toast.success("Category hierarchy successfully saved")
-      setOriginalCategories([...categories])
+      await loadCategories()
     } catch (err: any) {
       toast.error(err?.message || "Failed to save category order")
     } finally {
